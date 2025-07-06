@@ -55,28 +55,15 @@ class CustomerSerializer(serializers.ModelSerializer):
             'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
             'preferred_currency', 'preferred_language', 'timezone',
             'email_notifications', 'marketing_emails', 'sms_notifications',
-            'social_media_links', 'is_verified', 'is_premium', 'account_type',
-            'last_login', 'total_orders', 'total_spent', 'created_at', 'updated_at'
+            'is_verified', 'last_login', 'total_orders', 'total_spent', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'user', 'avatar_url', 'full_name', 'display_name', 
-                           'is_verified', 'is_premium', 'last_login', 'total_orders', 
+                           'is_verified', 'last_login', 'total_orders', 
                            'total_spent', 'created_at', 'updated_at']
     
     def get_avatar_url(self, obj):
         """Return avatar URL or None"""
         return obj.get_avatar_url()
-    
-    def validate_social_media_links(self, value):
-        """Validate social media links structure"""
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("Social media links must be a dictionary")
-        
-        allowed_platforms = ['facebook', 'twitter', 'instagram', 'linkedin', 'youtube', 'website']
-        for platform in value.keys():
-            if platform not in allowed_platforms:
-                raise serializers.ValidationError(f"Platform '{platform}' is not allowed")
-        
-        return value
 
 
 class CustomerUpdateSerializer(serializers.ModelSerializer):
@@ -87,20 +74,8 @@ class CustomerUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'phone', 'date_of_birth', 'bio', 'website', 'company', 'job_title',
             'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
-            'preferred_currency', 'preferred_language', 'timezone', 'social_media_links'
+            'preferred_currency', 'preferred_language', 'timezone'
         ]
-    
-    def validate_social_media_links(self, value):
-        """Validate social media links structure"""
-        if not isinstance(value, dict):
-            raise serializers.ValidationError("Social media links must be a dictionary")
-        
-        allowed_platforms = ['facebook', 'twitter', 'instagram', 'linkedin', 'youtube', 'website']
-        for platform in value.keys():
-            if platform not in allowed_platforms:
-                raise serializers.ValidationError(f"Platform '{platform}' is not allowed")
-        
-        return value
 
 
 class CustomerNotificationPreferencesSerializer(serializers.ModelSerializer):
@@ -199,8 +174,34 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['id', 'order_id', 'order_date', 'status', 'total_price', 
                  'shipping_cost', 'shipping_method', 'tracking_number',
-                 'items', 'shipping_address']
-        read_only_fields = ['order_id', 'order_date']
+                 'items', 'shipping_address', 'is_archived', 'archived_at']
+        read_only_fields = ['order_id', 'order_date', 'is_archived', 'archived_at']
+
+
+class DashboardStatsSerializer(serializers.Serializer):
+    """Serializer for dashboard statistics"""
+    total_orders = serializers.IntegerField()
+    total_revenue = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_customers = serializers.IntegerField()
+    recent_orders = OrderSerializer(many=True, read_only=True)
+    orders_by_status = serializers.DictField()
+    monthly_revenue = serializers.ListField()
+
+
+class BulkOrderOperationSerializer(serializers.Serializer):
+    """Serializer for bulk order operations"""
+    order_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        min_length=1,
+        max_length=100
+    )
+    action = serializers.ChoiceField(choices=['archive', 'unarchive'])
+    
+    def validate_order_ids(self, value):
+        """Validate that order IDs exist"""
+        if not value:
+            raise serializers.ValidationError("At least one order ID is required")
+        return value
 
 
 class CartItemSerializer(serializers.ModelSerializer):

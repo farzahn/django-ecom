@@ -3,6 +3,8 @@ from django.contrib.auth.models import User
 from django.contrib.auth import login, logout
 from django.db import transaction
 from django.utils import timezone
+from django.db.models import Q, Count, Sum
+from django.http import HttpResponse
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -10,13 +12,16 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser, FormParser
+import csv
+import datetime
 from .permissions import IsCustomerOwner, IsActivityOwner, IsShippingAddressOwner, IsOrderOwner
 from .models import Product, Customer, Order, OrderItem, ShippingAddress, Cart, CartItem, UserActivity
 from .serializers import (
     UserSerializer, LoginSerializer, CustomerSerializer, CustomerUpdateSerializer,
     CustomerNotificationPreferencesSerializer, UserActivitySerializer, AvatarUploadSerializer,
     ProductSerializer, ProductListSerializer, OrderSerializer, ShippingAddressSerializer,
-    CartSerializer, CartItemSerializer, CheckoutSerializer
+    CartSerializer, CartItemSerializer, CheckoutSerializer, DashboardStatsSerializer,
+    BulkOrderOperationSerializer
 )
 
 
@@ -222,11 +227,68 @@ class CustomerViewSet(viewsets.ModelViewSet):
             'member_since': customer.created_at,
             'last_login': customer.last_login,
             'is_verified': customer.is_verified,
-            'is_premium': customer.is_premium,
-            'account_type': customer.account_type,
         }
         
         return Response(stats)
+    
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """Get current user's customer profile"""
+        try:
+            customer = Customer.objects.select_related('user').get(user=request.user)
+            customer.update_activity_stats()
+            serializer = CustomerSerializer(customer)
+            return Response(serializer.data)
+        except Customer.DoesNotExist:
+            customer = Customer.objects.create(
+                user=request.user,
+                last_login=timezone.now()
+            )
+            serializer = CustomerSerializer(customer)
+            return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def activities(self, request):
+        """Get current user's activity log"""
+        try:
+            customer = Customer.objects.select_related('user').get(user=request.user)
+            activities = UserActivity.objects.filter(user=customer.user)[:50]  # Last 50 activities
+            serializer = UserActivitySerializer(activities, many=True)
+            return Response(serializer.data)
+        except Customer.DoesNotExist:
+            return Response({'error': 'Customer profile not found'}, status=404)
+    
+    @action(detail=False, methods=['get', 'patch'])
+    def notification_preferences(self, request):
+        """Get or update current user's notification preferences"""
+        try:
+            customer = Customer.objects.select_related('user').get(user=request.user)
+            
+            if request.method == 'GET':
+                serializer = CustomerNotificationPreferencesSerializer(customer)
+                return Response(serializer.data)
+            
+            elif request.method == 'PATCH':
+                serializer = CustomerNotificationPreferencesSerializer(
+                    customer, data=request.data, partial=True
+                )
+                
+                if serializer.is_valid():
+                    serializer.save()
+                    
+                    # Log preferences update activity
+                    UserActivity.log_activity(
+                        user=request.user,
+                        activity_type='preferences_updated',
+                        description="Notification preferences updated",
+                        ip_address=get_client_ip(request),
+                        user_agent=get_user_agent(request)
+                    )
+                    
+                    return Response(serializer.data)
+                return Response(serializer.errors, status=400)
+        except Customer.DoesNotExist:
+            return Response({'error': 'Customer profile not found'}, status=404)
 
 
 class ShippingAddressViewSet(viewsets.ModelViewSet):
@@ -250,7 +312,144 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
     
     def get_queryset(self):
         customer = get_object_or_404(Customer, user=self.request.user)
-        return Order.objects.filter(customer=customer)
+        queryset = Order.objects.filter(customer=customer)
+        
+        # Filter by archive status
+        show_archived = self.request.query_params.get('archived', 'false').lower() == 'true'
+        if show_archived:
+            queryset = queryset.filter(is_archived=True)
+        else:
+            queryset = queryset.filter(is_archived=False)
+        
+        return queryset
+    
+    @action(detail=False, methods=['post'])
+    def bulk_operations(self, request):
+        """Handle bulk archive/unarchive operations"""
+        serializer = BulkOrderOperationSerializer(data=request.data)
+        if serializer.is_valid():
+            order_ids = serializer.validated_data['order_ids']
+            action = serializer.validated_data['action']
+            
+            try:
+                if action == 'archive':
+                    updated_count = Order.bulk_archive(order_ids, user=request.user)
+                    message = f"Successfully archived {updated_count} orders"
+                else:  # unarchive
+                    updated_count = Order.bulk_unarchive(order_ids, user=request.user)
+                    message = f"Successfully unarchived {updated_count} orders"
+                
+                return Response({
+                    'message': message,
+                    'updated_count': updated_count
+                }, status=status.HTTP_200_OK)
+            
+            except Exception as e:
+                return Response({
+                    'error': f'Failed to {action} orders: {str(e)}'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['get'])
+    def export_csv(self, request):
+        """Export orders to CSV"""
+        customer = get_object_or_404(Customer, user=request.user)
+        orders = Order.objects.filter(customer=customer).select_related('shipping_address')
+        
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = f'attachment; filename="orders_{customer.user.username}_{timezone.now().strftime("%Y%m%d")}.csv"'
+        
+        writer = csv.writer(response)
+        writer.writerow([
+            'Order ID', 'Date', 'Status', 'Total Price', 'Shipping Cost',
+            'Shipping Method', 'Tracking Number', 'Customer Name', 'Shipping Address'
+        ])
+        
+        for order in orders:
+            shipping_address = ""
+            if order.shipping_address:
+                shipping_address = f"{order.shipping_address.address_line_1}, {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}"
+            
+            writer.writerow([
+                order.order_id,
+                order.order_date.strftime('%Y-%m-%d'),
+                order.get_status_display(),
+                str(order.total_price),
+                str(order.shipping_cost),
+                order.shipping_method,
+                order.tracking_number,
+                order.customer.get_display_name(),
+                shipping_address
+            ])
+        
+        return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_stats(request):
+    """Get comprehensive dashboard statistics for authenticated user"""
+    try:
+        customer = Customer.objects.get(user=request.user)
+        
+        # Get date range for statistics (last 30 days)
+        end_date = timezone.now()
+        start_date = end_date - datetime.timedelta(days=30)
+        
+        # Basic stats
+        total_orders = Order.objects.filter(customer=customer).count()
+        total_revenue = Order.objects.filter(
+            customer=customer,
+            status__in=['processing', 'shipped', 'delivered']
+        ).aggregate(total=Sum('total_price'))['total'] or 0
+        
+        # Recent orders (last 10)
+        recent_orders = Order.objects.filter(customer=customer)[:10]
+        
+        # Orders by status
+        orders_by_status = Order.objects.filter(customer=customer).values('status').annotate(
+            count=Count('id')
+        ).order_by('status')
+        
+        status_dict = {item['status']: item['count'] for item in orders_by_status}
+        
+        # Monthly revenue (last 12 months)
+        monthly_revenue = []
+        for i in range(12):
+            month_start = (end_date - datetime.timedelta(days=30*i)).replace(day=1)
+            month_end = (month_start + datetime.timedelta(days=32)).replace(day=1) - datetime.timedelta(days=1)
+            
+            revenue = Order.objects.filter(
+                customer=customer,
+                order_date__range=[month_start, month_end],
+                status__in=['processing', 'shipped', 'delivered']
+            ).aggregate(total=Sum('total_price'))['total'] or 0
+            
+            monthly_revenue.append({
+                'month': month_start.strftime('%Y-%m'),
+                'revenue': float(revenue)
+            })
+        
+        monthly_revenue.reverse()  # Show oldest to newest
+        
+        # Prepare data for serializer
+        stats_data = {
+            'total_orders': total_orders,
+            'total_revenue': total_revenue,
+            'total_customers': 1,  # Single customer dashboard
+            'recent_orders': recent_orders,
+            'orders_by_status': status_dict,
+            'monthly_revenue': monthly_revenue,
+        }
+        
+        serializer = DashboardStatsSerializer(stats_data)
+        return Response(serializer.data)
+        
+    except Customer.DoesNotExist:
+        return Response({'error': 'Customer profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
@@ -528,6 +727,7 @@ def api_info(request):
             'cart': '/api/cart/',
             'orders': '/api/orders/',
             'shipping': '/api/shipping-addresses/',
+            'dashboard': '/api/dashboard/',
             'admin': '/admin/',
         }
     })

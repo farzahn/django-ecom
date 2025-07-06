@@ -5,6 +5,7 @@ from django.core.validators import MinValueValidator, MaxValueValidator, FileExt
 from django.core.exceptions import ValidationError
 import uuid
 import os
+import re
 
 
 def validate_file_size(value):
@@ -19,6 +20,31 @@ def user_avatar_upload_path(instance, filename):
     ext = filename.split('.')[-1]
     filename = f'{instance.user.id}_avatar.{ext}'
     return os.path.join('avatars/', filename)
+
+
+def validate_us_postal_code(value):
+    """Validate US postal code format"""
+    if not re.match(r'^\d{5}(-\d{4})?$', value):
+        raise ValidationError('Invalid US postal code format. Use 12345 or 12345-6789.')
+
+
+def validate_us_state(value):
+    """Validate US state abbreviation"""
+    us_states = {
+        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+        'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+        'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+        'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    }
+    if value.upper() not in us_states:
+        raise ValidationError('Invalid US state abbreviation.')
+
+
+def validate_us_phone(value):
+    """Validate US phone number format"""
+    if not re.match(r'^\+?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$', value):
+        raise ValidationError('Invalid US phone number format. Use (123) 456-7890 or similar format.')
 
 
 class Product(models.Model):
@@ -69,7 +95,7 @@ class Customer(models.Model):
     
     # Basic fields (existing)
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    phone = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=20, blank=True, validators=[validate_us_phone])
     date_of_birth = models.DateField(null=True, blank=True)
     
     # Profile enhancement fields
@@ -139,30 +165,10 @@ class Customer(models.Model):
         help_text="Receive SMS notifications for order updates"
     )
     
-    # Social media links
-    social_media_links = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Social media profile links (JSON format)"
-    )
-    
     # Account settings
     is_verified = models.BooleanField(
         default=False,
         help_text="Email verification status"
-    )
-    is_premium = models.BooleanField(
-        default=False,
-        help_text="Premium account status"
-    )
-    account_type = models.CharField(
-        max_length=20,
-        default='individual',
-        choices=[
-            ('individual', 'Individual'),
-            ('business', 'Business'),
-            ('enterprise', 'Enterprise'),
-        ]
     )
     
     # Activity tracking
@@ -179,7 +185,6 @@ class Customer(models.Model):
         indexes = [
             models.Index(fields=['user']),
             models.Index(fields=['is_verified']),
-            models.Index(fields=['account_type']),
         ]
 
     def __str__(self):
@@ -237,6 +242,7 @@ class UserActivity(models.Model):
         ('address_updated', 'Address Updated'),
         ('avatar_uploaded', 'Avatar Uploaded'),
         ('preferences_updated', 'Preferences Updated'),
+        ('system_cleanup', 'System Cleanup'),
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activities')
@@ -276,9 +282,9 @@ class ShippingAddress(models.Model):
     address_line_1 = models.CharField(max_length=255)
     address_line_2 = models.CharField(max_length=255, blank=True)
     city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
-    country = models.CharField(max_length=100)
+    state = models.CharField(max_length=2, validators=[validate_us_state], help_text="2-letter US state abbreviation")
+    postal_code = models.CharField(max_length=10, validators=[validate_us_postal_code], help_text="US postal code (12345 or 12345-6789)")
+    country = models.CharField(max_length=100, default='United States')
     is_default = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -288,6 +294,22 @@ class ShippingAddress(models.Model):
 
     def __str__(self):
         return f"{self.full_name} - {self.city}, {self.state}"
+    
+    def clean(self):
+        """Additional validation for US addresses"""
+        super().clean()
+        # Accept multiple formats for United States
+        valid_us_formats = ['us', 'usa', 'united states', 'united states of america']
+        if self.country.lower() not in valid_us_formats:
+            raise ValidationError('Only United States addresses are supported.')
+        
+        # Ensure state is uppercase
+        if self.state:
+            self.state = self.state.upper()
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class Order(models.Model):
@@ -297,6 +319,7 @@ class Order(models.Model):
         ('shipped', 'Shipped'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
+        ('archived', 'Archived'),
     ]
 
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='orders')
@@ -315,11 +338,20 @@ class Order(models.Model):
     shipping_method = models.CharField(max_length=100, blank=True)
     tracking_number = models.CharField(max_length=200, blank=True)
     
+    # Archive functionality
+    is_archived = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-order_date']
+        indexes = [
+            models.Index(fields=['customer', 'status']),
+            models.Index(fields=['order_date']),
+            models.Index(fields=['is_archived']),
+        ]
 
     def __str__(self):
         return f"Order {self.order_id}"
@@ -328,6 +360,46 @@ class Order(models.Model):
         if not self.order_id:
             self.order_id = str(uuid.uuid4())[:8].upper()
         super().save(*args, **kwargs)
+    
+    def archive(self):
+        """Archive this order"""
+        from django.utils import timezone
+        self.is_archived = True
+        self.archived_at = timezone.now()
+        self.save(update_fields=['is_archived', 'archived_at'])
+    
+    def unarchive(self):
+        """Unarchive this order"""
+        self.is_archived = False
+        self.archived_at = None
+        self.save(update_fields=['is_archived', 'archived_at'])
+    
+    @classmethod
+    def bulk_archive(cls, order_ids, user=None):
+        """Archive multiple orders"""
+        from django.utils import timezone
+        queryset = cls.objects.filter(id__in=order_ids)
+        if user:
+            queryset = queryset.filter(customer__user=user)
+        
+        updated_count = queryset.update(
+            is_archived=True,
+            archived_at=timezone.now()
+        )
+        return updated_count
+    
+    @classmethod
+    def bulk_unarchive(cls, order_ids, user=None):
+        """Unarchive multiple orders"""
+        queryset = cls.objects.filter(id__in=order_ids, is_archived=True)
+        if user:
+            queryset = queryset.filter(customer__user=user)
+        
+        updated_count = queryset.update(
+            is_archived=False,
+            archived_at=None
+        )
+        return updated_count
 
 
 class OrderItem(models.Model):

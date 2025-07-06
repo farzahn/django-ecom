@@ -90,12 +90,36 @@ WSGI_APPLICATION = 'pasargadprints.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Check if PostgreSQL environment variables are available
+db_name = os.getenv('DB_NAME') or os.getenv('POSTGRES_DB')
+db_user = os.getenv('DB_USER') or os.getenv('POSTGRES_USER')
+db_password = os.getenv('DB_PASSWORD') or os.getenv('POSTGRES_PASSWORD')
+db_host = os.getenv('DB_HOST') or os.getenv('POSTGRES_HOST', 'localhost')
+db_port = os.getenv('DB_PORT', '5432')
+
+if db_name and db_user and db_password:
+    # Use PostgreSQL if environment variables are available
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': db_name,
+            'USER': db_user,
+            'PASSWORD': db_password,
+            'HOST': db_host,
+            'PORT': db_port,
+            'OPTIONS': {
+                'connect_timeout': 20,
+            },
+        }
     }
-}
+else:
+    # Fallback to SQLite for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
