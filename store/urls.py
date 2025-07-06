@@ -4,7 +4,7 @@ from . import views
 from . import stripe_views
 from . import shipping_views
 
-router = DefaultRouter()
+router = DefaultRouter(trailing_slash=False)
 router.register(r'products', views.ProductViewSet)
 router.register(r'customers', views.CustomerViewSet)
 router.register(r'orders', views.OrderViewSet)
@@ -29,6 +29,9 @@ urlpatterns = [
     # /api/customers/{id}/notification_preferences/
     # /api/customers/{id}/activity_log/
     # /api/customers/{id}/stats/
+    
+    # Dashboard
+    path('api/dashboard/', views.dashboard_stats, name='dashboard_stats'),
     
     # Cart
     path('api/cart/', views.cart_view, name='cart'),
