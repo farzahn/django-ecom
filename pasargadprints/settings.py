@@ -32,6 +32,7 @@ DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    'testserver',  # For Django test client
     '.herokuapp.com',  # For Heroku deployments
     '.railway.app',   # For Railway deployments
     '.vercel.app',    # For Vercel deployments
