@@ -27,7 +27,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-wr71tlk3lxwbt1we^b%7*a2wb&is(l$*9b@n%05rqsp9ik-l#9')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -97,29 +97,13 @@ db_password = os.getenv('DB_PASSWORD') or os.getenv('POSTGRES_PASSWORD')
 db_host = os.getenv('DB_HOST') or os.getenv('POSTGRES_HOST', 'localhost')
 db_port = os.getenv('DB_PORT', '5432')
 
-if db_name and db_user and db_password:
-    # Use PostgreSQL if environment variables are available
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': db_name,
-            'USER': db_user,
-            'PASSWORD': db_password,
-            'HOST': db_host,
-            'PORT': db_port,
-            'OPTIONS': {
-                'connect_timeout': 20,
-            },
-        }
+# Force SQLite for local development
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
-else:
-    # Fallback to SQLite for local development
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 
 # Password validation

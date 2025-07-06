@@ -1,0 +1,5 @@
+plan, design, develop, and test a completly redesigned User Profile/Dashboard page
+
+
+
+kill all instances of react, django, and all docker containers. prune docker
