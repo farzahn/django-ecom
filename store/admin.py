@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django.utils.safestring import mark_safe
-from .models import Product, ProductImage, Customer, Order, OrderItem, ShippingAddress, Cart, CartItem
+from .models import (Product, ProductImage, Customer, Order, OrderItem, ShippingAddress, 
+                    Cart, CartItem, WebhookEvent, WebhookSecurityLog, UserActivity)
 
 
 class ProductImageInline(admin.TabularInline):
@@ -158,6 +159,112 @@ class CartItemAdmin(admin.ModelAdmin):
     list_filter = ['created_at']
     search_fields = ['cart__customer__user__username', 'product__name']
     readonly_fields = ['total_price']
+
+
+@admin.register(WebhookEvent)
+class WebhookEventAdmin(admin.ModelAdmin):
+    list_display = ['event_id', 'event_type', 'status', 'source', 'processing_attempts', 'created_at']
+    list_filter = ['status', 'event_type', 'source', 'created_at']
+    search_fields = ['event_id', 'event_type']
+    readonly_fields = ['event_id', 'event_type', 'source', 'payload_hash', 'payload_size', 
+                      'api_version', 'processing_attempts', 'first_attempt_at', 'last_attempt_at',
+                      'processed_at', 'created_at', 'updated_at']
+    
+    fieldsets = (
+        ('Event Information', {
+            'fields': ('event_id', 'event_type', 'source', 'status', 'api_version')
+        }),
+        ('Processing Status', {
+            'fields': ('processing_attempts', 'first_attempt_at', 'last_attempt_at', 'processed_at')
+        }),
+        ('Payload Information', {
+            'fields': ('payload_hash', 'payload_size')
+        }),
+        ('Related Objects', {
+            'fields': ('related_order', 'related_customer')
+        }),
+        ('Error Information', {
+            'fields': ('error_message', 'error_count'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(WebhookSecurityLog)
+class WebhookSecurityLogAdmin(admin.ModelAdmin):
+    list_display = ['event_type', 'severity', 'webhook_source', 'webhook_event_id', 'ip_address', 'timestamp']
+    list_filter = ['event_type', 'severity', 'webhook_source', 'timestamp']
+    search_fields = ['webhook_event_id', 'webhook_event_type', 'ip_address']
+    readonly_fields = ['event_type', 'severity', 'ip_address', 'user_agent', 'request_method',
+                      'request_path', 'webhook_source', 'webhook_event_id', 'webhook_event_type',
+                      'signature_valid', 'payload_size', 'payload_hash', 'error_message',
+                      'error_code', 'metadata', 'timestamp']
+    
+    fieldsets = (
+        ('Security Event', {
+            'fields': ('event_type', 'severity', 'timestamp')
+        }),
+        ('Request Information', {
+            'fields': ('ip_address', 'user_agent', 'request_method', 'request_path')
+        }),
+        ('Webhook Information', {
+            'fields': ('webhook_source', 'webhook_event_id', 'webhook_event_type')
+        }),
+        ('Security Details', {
+            'fields': ('signature_valid', 'payload_size', 'payload_hash')
+        }),
+        ('Error Information', {
+            'fields': ('error_message', 'error_code'),
+            'classes': ('collapse',)
+        }),
+        ('Additional Context', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(UserActivity)
+class UserActivityAdmin(admin.ModelAdmin):
+    list_display = ['user', 'activity_type', 'timestamp', 'ip_address']
+    list_filter = ['activity_type', 'timestamp']
+    search_fields = ['user__username', 'user__email', 'description']
+    readonly_fields = ['user', 'activity_type', 'description', 'ip_address', 'user_agent', 'metadata', 'timestamp']
+    
+    fieldsets = (
+        ('Activity Information', {
+            'fields': ('user', 'activity_type', 'description', 'timestamp')
+        }),
+        ('Request Information', {
+            'fields': ('ip_address', 'user_agent')
+        }),
+        ('Additional Context', {
+            'fields': ('metadata',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 # Customize admin site
