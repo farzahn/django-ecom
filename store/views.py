@@ -5,9 +5,9 @@ from django.db import transaction
 from django.utils import timezone
 from django.db.models import Q, Count, Sum
 from django.http import HttpResponse
-from django.views.decorators.csrf import csrf_exempt
+# CSRF exemption handled by DRF authentication_classes=[]
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes, authentication_classes
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -455,7 +455,7 @@ def dashboard_stats(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@csrf_exempt
+@authentication_classes([])  # Disable authentication for register endpoint
 def register(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
@@ -482,7 +482,7 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
-@csrf_exempt
+@authentication_classes([])  # Disable authentication for login endpoint
 def login_view(request):
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
