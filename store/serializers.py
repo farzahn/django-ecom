@@ -51,7 +51,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         model = Customer
         fields = [
             'id', 'user', 'phone', 'date_of_birth', 'avatar', 'avatar_url',
-            'bio', 'website', 'company', 'job_title', 'full_name', 'display_name',
+            'website', 'full_name', 'display_name',
             'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
             'preferred_currency', 'preferred_language', 'timezone',
             'email_notifications', 'marketing_emails', 'sms_notifications',
@@ -72,7 +72,7 @@ class CustomerUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
         fields = [
-            'phone', 'date_of_birth', 'bio', 'website', 'company', 'job_title',
+            'phone', 'date_of_birth', 'website',
             'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country',
             'preferred_currency', 'preferred_language', 'timezone'
         ]
