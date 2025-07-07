@@ -1,45 +1,23 @@
 # Django
+*.log
+*.pot
+*.pyc
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Environment
-.env
-.venv
-env/
-venv/
-ENV/
-env.bak/
-venv.bak/
-
-# Database
-*.db
-*.sqlite3
+local_settings.py
 db.sqlite3
-
-# Media files
+db.sqlite3-journal
 media/
-
-# Static files
 staticfiles/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Virtual environment
+venv/
+env/
+ENV/
 
 # IDE
 .vscode/
@@ -57,5 +35,53 @@ staticfiles/
 ehthumbs.db
 Thumbs.db
 
-# Logs
-*.log
+# Node modules and build
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build/
+dist/
+
+# React build
+/frontend/build/
+/frontend/dist/
+
+# Testing
+coverage/
+.coverage
+.pytest_cache/
+.tox/
+
+# Development artifacts
+test_*.py
+temp_*.html
+temp_*.py
+*_temp.*
+logs/
+*.tmp
+
+# Documentation workspace (keep only essential files)
+docs/workspaces/temp_*
+docs/workspaces/review-*
+
+# Deployment
+nginx/logs/
+server.log
+react.log
+django.log
+react-dev.log
+
+# Backup files
+*.bak
+*.backup
+*~.backup
+
+# Package files
+*.deb
+*.rpm
+*.pkg
+
+# Docker
+.dockerignore
+docker-compose.override.yml
