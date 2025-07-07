@@ -245,8 +245,9 @@ class CheckoutSerializer(serializers.Serializer):
         return value
     
     def validate_shipping_rate_id(self, value):
-        if value and not value.startswith('shippo_'):
-            raise serializers.ValidationError("Invalid shipping rate ID format")
+        # Allow empty/None values since shipping is optional for some cases
+        if value is not None and len(str(value).strip()) == 0:
+            raise serializers.ValidationError("Shipping rate ID cannot be empty")
         return value
     
     def validate_shipping_cost(self, value):
