@@ -585,9 +585,13 @@ def get_or_create_cart(user, session_key):
     return cart
 
 
-@api_view(['GET'])
+@api_view(['GET', 'HEAD'])
 @permission_classes([AllowAny])
 def cart_view(request):
+    # Handle HEAD requests for CORS compatibility
+    if request.method == 'HEAD':
+        return Response(status=200)
+    
     session_key = request.session.session_key
     if not session_key:
         request.session.create()
