@@ -1,5 +1,6 @@
 import stripe
 import logging
+import os
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -72,7 +73,13 @@ def create_checkout_session(request):
             
             # Add product images if available
             if item.product.images.exists():
-                product_data['images'] = [item.product.images.first().image.url]
+                image_url = item.product.images.first().image.url
+                # Ensure image URL is absolute for Stripe
+                if image_url.startswith('/'):
+                    # Convert relative URL to absolute URL
+                    base_url = request.build_absolute_uri('/').rstrip('/')
+                    image_url = f"{base_url}{image_url}"
+                product_data['images'] = [image_url]
             
             line_items.append({
                 'price_data': {
@@ -103,89 +110,27 @@ def create_checkout_session(request):
         except Exception as e:
             logging.getLogger(__name__).warning(f"Failed to create/retrieve Stripe customer: {e}")
         
-        # Enhanced checkout session with 2025 best practices
+        # Configure frontend URLs for redirect after payment
+        frontend_url = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+        if not frontend_url.startswith('http'):
+            frontend_url = f'https://{frontend_url}'
+        
+        success_url = f'{frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}'
+        cancel_url = f'{frontend_url}/cancel'
+        
+        # Create Stripe checkout session with basic configuration
         session_params = {
             'payment_method_types': ['card'],
             'line_items': line_items,
             'mode': 'payment',
-            'success_url': 'http://localhost:3000/success?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url': 'http://localhost:3000/cancel',
+            'success_url': success_url,
+            'cancel_url': cancel_url,
             'metadata': {
                 'customer_id': str(customer.id),
                 'shipping_address_id': str(shipping_address.id),
                 'cart_total': str(cart.total_price),
                 'order_type': '3d_print_products',
                 'source': 'web_checkout'
-            },
-            'shipping_address_collection': {
-                'allowed_countries': ['US', 'CA'],  # Configurable based on business needs
-            },
-            'shipping_options': [
-                {
-                    'shipping_rate_data': {
-                        'type': 'fixed_amount',
-                        'fixed_amount': {
-                            'amount': 999,  # $9.99 standard shipping
-                            'currency': 'usd',
-                        },
-                        'display_name': 'Standard Shipping',
-                        'delivery_estimate': {
-                            'minimum': {
-                                'unit': 'business_day',
-                                'value': 5,
-                            },
-                            'maximum': {
-                                'unit': 'business_day',
-                                'value': 7,
-                            },
-                        },
-                    },
-                },
-                {
-                    'shipping_rate_data': {
-                        'type': 'fixed_amount',
-                        'fixed_amount': {
-                            'amount': 1999,  # $19.99 express shipping
-                            'currency': 'usd',
-                        },
-                        'display_name': 'Express Shipping',
-                        'delivery_estimate': {
-                            'minimum': {
-                                'unit': 'business_day',
-                                'value': 1,
-                            },
-                            'maximum': {
-                                'unit': 'business_day',
-                                'value': 3,
-                            },
-                        },
-                    },
-                },
-            ],
-            'phone_number_collection': {
-                'enabled': True
-            },
-            'custom_text': {
-                'shipping_address': {
-                    'message': 'Please provide accurate shipping information for your 3D printed items.'
-                },
-                'submit': {
-                    'message': 'We\'ll email you instructions on how to track your order.'
-                }
-            },
-            'invoice_creation': {
-                'enabled': True,
-                'invoice_data': {
-                    'description': f'PasargadPrints Order - {cart.total_items} items',
-                    'metadata': {
-                        'customer_id': str(customer.id),
-                        'order_date': cart.created_at.isoformat()
-                    },
-                    'footer': 'Thank you for your business with PasargadPrints!'
-                }
-            },
-            'consent_collection': {
-                'terms_of_service': 'required'
             }
         }
         
@@ -195,7 +140,7 @@ def create_checkout_session(request):
         else:
             session_params['customer_email'] = customer.user.email
         
-        # Create the enhanced checkout session
+        # Create the checkout session
         checkout_session = stripe.checkout.Session.create(**session_params)
         
         return Response({
