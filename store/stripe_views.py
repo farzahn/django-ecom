@@ -98,7 +98,7 @@ def create_checkout_session(request):
                 'quantity': item.quantity,
             })
         
-        # Add shipping as line item if shipping rate is provided
+        # Add GoShippo shipping as line item if shipping rate is provided
         if shipping_cost and shipping_cost > 0:
             shipping_line_item = {
                 'price_data': {
@@ -108,6 +108,7 @@ def create_checkout_session(request):
                         'description': f'Estimated delivery: {shipping_estimated_days} days' if shipping_estimated_days else 'Standard shipping',
                         'metadata': {
                             'type': 'shipping',
+                            'source': 'goshippo',  # Mark as GoShippo sourced
                             'rate_id': shipping_rate_id or '',
                             'carrier': shipping_carrier or '',
                             'service': shipping_service or '',
@@ -148,19 +149,24 @@ def create_checkout_session(request):
         success_url = f'{frontend_url}/success?session_id={{CHECKOUT_SESSION_ID}}'
         cancel_url = f'{frontend_url}/cancel'
         
-        # Create Stripe checkout session with basic configuration
+        # Create Stripe checkout session with GoShippo shipping configuration
         session_params = {
             'payment_method_types': ['card'],
             'line_items': line_items,
             'mode': 'payment',
             'success_url': success_url,
             'cancel_url': cancel_url,
+            # Disable Stripe's automatic shipping options to use our GoShippo rates
+            'shipping_address_collection': None,  # Explicitly disable
+            'shipping_options': [],  # Empty to prevent Stripe shipping options
+            'automatic_tax': {'enabled': False},  # Disable automatic tax and shipping
             'metadata': {
                 'customer_id': str(customer.id),
                 'shipping_address_id': str(shipping_address.id),
                 'cart_total': str(cart.total_price),
                 'order_type': '3d_print_products',
                 'source': 'web_checkout',
+                'shipping_integration': 'goshippo',  # Mark as using GoShippo
                 'shipping_rate_id': shipping_rate_id or '',
                 'shipping_carrier': shipping_carrier or '',
                 'shipping_service': shipping_service or '',
@@ -174,6 +180,10 @@ def create_checkout_session(request):
             session_params['customer'] = stripe_customer.id
         else:
             session_params['customer_email'] = customer.user.email
+        
+        # Validate that we're not accidentally enabling Stripe shipping
+        if 'shipping_address_collection' in session_params and session_params['shipping_address_collection']:
+            logging.getLogger(__name__).warning("Stripe shipping address collection is enabled - this may override GoShippo rates")
         
         # Create the checkout session
         checkout_session = stripe.checkout.Session.create(**session_params)
