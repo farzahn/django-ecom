@@ -4,262 +4,60 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Styling Consistency Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            DEFAULT: '#667eea',
+                            hover: '#5a67d8',
+                            active: '#4c51bf',
+                            light: '#e6f3ff',
+                            dark: '#2d3748'
+                        },
+                        accent: {
+                            DEFAULT: '#e74c3c',
+                            hover: '#c0392b',
+                            light: '#fadbd8'
+                        },
+                        success: {
+                            DEFAULT: '#48bb78',
+                            hover: '#38a169',
+                            light: '#c6f6d5'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* Import the variables */
-        @import url('../frontend/src/styles/variables.css');
-        
+        /* Custom styles for demonstration using Tailwind classes */
         body {
-            font-family: var(--font-family);
-            margin: 0;
-            padding: var(--space-4);
-            background-color: var(--bg-secondary);
-            color: var(--text-primary);
-        }
-        
-        .test-container {
-            max-width: var(--container-max);
-            margin: 0 auto;
-        }
-        
-        .test-section {
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-            margin-bottom: var(--space-6);
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .test-title {
-            font-size: var(--font-size-2xl);
-            font-weight: var(--font-weight-semibold);
-            color: var(--text-primary);
-            margin-bottom: var(--space-4);
-            border-bottom: 1px solid var(--border-light);
-            padding-bottom: var(--space-2);
-        }
-        
-        .color-palette {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: var(--space-4);
-            margin-bottom: var(--space-6);
-        }
-        
-        .color-swatch {
-            padding: var(--space-4);
-            border-radius: var(--radius-lg);
-            text-align: center;
-            color: var(--text-white);
-            font-weight: var(--font-weight-medium);
-        }
-        
-        .primary { background-color: var(--primary-color); }
-        .primary-hover { background-color: var(--primary-hover); }
-        .secondary { background-color: var(--secondary-color); }
-        .accent { background-color: var(--accent-color); }
-        .success { background-color: var(--success-color); }
-        .warning { background-color: var(--warning-color); }
-        
-        .button-test {
-            display: flex;
-            gap: var(--space-4);
-            flex-wrap: wrap;
-            margin-bottom: var(--space-6);
-        }
-        
-        .btn {
-            padding: var(--space-3) var(--space-6);
-            border: none;
-            border-radius: var(--radius-lg);
-            cursor: pointer;
-            font-size: var(--font-size-base);
-            font-weight: var(--font-weight-semibold);
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
-            transition: var(--transition-base);
-        }
-        
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: var(--text-white);
-        }
-        
-        .btn-secondary {
-            background-color: var(--secondary-color);
-            color: var(--text-white);
-        }
-        
-        .btn-danger {
-            background-color: var(--accent-color);
-            color: var(--text-white);
-        }
-        
-        .spacing-test {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: var(--space-2);
-        }
-        
-        .spacing-box {
-            background-color: var(--primary-light);
-            border: 1px solid var(--primary-color);
-            text-align: center;
-            font-size: var(--font-size-sm);
-            font-weight: var(--font-weight-medium);
-        }
-        
-        .space-1 { padding: var(--space-1); }
-        .space-2 { padding: var(--space-2); }
-        .space-3 { padding: var(--space-3); }
-        .space-4 { padding: var(--space-4); }
-        .space-6 { padding: var(--space-6); }
-        .space-8 { padding: var(--space-8); }
-        
-        .typography-test h1 { font-size: var(--font-size-4xl); margin: var(--space-2) 0; }
-        .typography-test h2 { font-size: var(--font-size-3xl); margin: var(--space-2) 0; }
-        .typography-test h3 { font-size: var(--font-size-2xl); margin: var(--space-2) 0; }
-        .typography-test h4 { font-size: var(--font-size-xl); margin: var(--space-2) 0; }
-        .typography-test p { font-size: var(--font-size-base); margin: var(--space-2) 0; }
-        .typography-test small { font-size: var(--font-size-sm); margin: var(--space-2) 0; }
-        
-        .form-test {
-            display: grid;
-            gap: var(--space-4);
-            max-width: 400px;
-        }
-        
-        .form-group {
-            margin-bottom: var(--space-4);
-        }
-        
-        .form-label {
-            display: block;
-            margin-bottom: var(--space-2);
-            font-weight: var(--font-weight-medium);
-            color: var(--text-primary);
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: var(--space-3);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            font-size: var(--font-size-base);
-            transition: var(--transition-base);
-        }
-        
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: var(--focus-ring);
-        }
-        
-        .dashboard-preview {
-            background-color: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            padding: var(--space-4);
-            margin-top: var(--space-4);
-        }
-        
-        .dashboard-card {
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-xl);
-            padding: var(--space-6);
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .responsive-test {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: var(--space-4);
-        }
-        
-        .responsive-box {
-            background-color: var(--info-light);
-            border: 1px solid var(--info-color);
-            border-radius: var(--radius-md);
-            padding: var(--space-4);
-            text-align: center;
-        }
-        
-        @media (max-width: 768px) {
-            .responsive-box {
-                background-color: var(--warning-light);
-                border-color: var(--warning-color);
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .responsive-box {
-                background-color: var(--accent-light);
-                border-color: var(--accent-color);
-            }
-        }
-        
-        .accessibility-test {
-            margin-top: var(--space-6);
-        }
-        
-        .focus-test {
-            padding: var(--space-3);
-            margin: var(--space-2);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-        }
-        
-        .focus-test:focus {
-            outline: none;
-            box-shadow: var(--focus-ring);
-        }
-        
-        .status-message {
-            padding: var(--space-4);
-            border-radius: var(--radius-md);
-            margin: var(--space-2) 0;
-            font-weight: var(--font-weight-medium);
-        }
-        
-        .success { 
-            background-color: var(--success-light); 
-            color: var(--success-color); 
-            border: 1px solid var(--success-color);
-        }
-        
-        .warning { 
-            background-color: var(--warning-light); 
-            color: var(--warning-color); 
-            border: 1px solid var(--warning-color);
-        }
-        
-        .error { 
-            background-color: var(--accent-light); 
-            color: var(--accent-color); 
-            border: 1px solid var(--accent-color);
+            font-family: 'Inter', sans-serif;
         }
     </style>
 </head>
-<body>
-    <div class="test-container">
-        <h1>Design System Consistency Test</h1>
+<body class="bg-gray-100 text-gray-900 p-6">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-4xl font-bold text-gray-900 mb-8">Design System Consistency Test</h1>
         
-        <div class="test-section">
-            <h2 class="test-title">Color Palette</h2>
-            <div class="color-palette">
-                <div class="color-swatch primary">Primary Color<br>--primary-color</div>
-                <div class="color-swatch primary-hover">Primary Hover<br>--primary-hover</div>
-                <div class="color-swatch secondary">Secondary<br>--secondary-color</div>
-                <div class="color-swatch accent">Accent/Danger<br>--accent-color</div>
-                <div class="color-swatch success">Success<br>--success-color</div>
-                <div class="color-swatch warning">Warning<br>--warning-color</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Color Palette</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div class="bg-primary text-white p-4 rounded-lg text-center font-medium">Primary Color<br>bg-primary</div>
+                <div class="bg-primary-hover text-white p-4 rounded-lg text-center font-medium">Primary Hover<br>bg-primary-hover</div>
+                <div class="bg-secondary text-white p-4 rounded-lg text-center font-medium">Secondary<br>bg-secondary</div>
+                <div class="bg-accent text-white p-4 rounded-lg text-center font-medium">Accent/Danger<br>bg-accent</div>
+                <div class="bg-success text-white p-4 rounded-lg text-center font-medium">Success<br>bg-success</div>
+                <div class="bg-warning text-white p-4 rounded-lg text-center font-medium">Warning<br>bg-warning</div>
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Button Consistency</h2>
-            <div class="button-test">
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Button Consistency</h2>
+            <div class="flex flex-wrap gap-4 mb-6">
                 <button class="btn btn-primary">Primary Button</button>
                 <button class="btn btn-secondary">Secondary Button</button>
                 <button class="btn btn-danger">Danger Button</button>
@@ -267,98 +65,98 @@
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Spacing Scale</h2>
-            <div class="spacing-test">
-                <div class="spacing-box space-1">space-1</div>
-                <div class="spacing-box space-2">space-2</div>
-                <div class="spacing-box space-3">space-3</div>
-                <div class="spacing-box space-4">space-4</div>
-                <div class="spacing-box space-6">space-6</div>
-                <div class="spacing-box space-8">space-8</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Spacing Scale</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                <div class="bg-primary-light border border-primary text-center text-sm font-medium p-1">space-1</div>
+                <div class="bg-primary-light border border-primary text-center text-sm font-medium p-2">space-2</div>
+                <div class="bg-primary-light border border-primary text-center text-sm font-medium p-3">space-3</div>
+                <div class="bg-primary-light border border-primary text-center text-sm font-medium p-4">space-4</div>
+                <div class="bg-primary-light border border-primary text-center text-sm font-medium p-6">space-6</div>
+                <div class="bg-primary-light border border-primary text-center text-sm font-medium p-8">space-8</div>
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Typography Scale</h2>
-            <div class="typography-test">
-                <h1>Heading 1 - font-size-4xl</h1>
-                <h2>Heading 2 - font-size-3xl</h2>
-                <h3>Heading 3 - font-size-2xl</h3>
-                <h4>Heading 4 - font-size-xl</h4>
-                <p>Paragraph text - font-size-base</p>
-                <small>Small text - font-size-sm</small>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Typography Scale</h2>
+            <div class="space-y-2">
+                <h1 class="text-4xl font-bold">Heading 1 - text-4xl</h1>
+                <h2 class="text-3xl font-bold">Heading 2 - text-3xl</h2>
+                <h3 class="text-2xl font-bold">Heading 3 - text-2xl</h3>
+                <h4 class="text-xl font-bold">Heading 4 - text-xl</h4>
+                <p class="text-base">Paragraph text - text-base</p>
+                <small class="text-sm">Small text - text-sm</small>
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Form Elements</h2>
-            <div class="form-test">
-                <div class="form-group">
-                    <label class="form-label" for="test-input">Test Input</label>
-                    <input type="text" id="test-input" class="form-control" placeholder="Enter text here">
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Form Elements</h2>
+            <div class="grid gap-4 max-w-md">
+                <div class="mb-4">
+                    <label class="block mb-2 font-medium text-gray-900" for="test-input">Test Input</label>
+                    <input type="text" id="test-input" class="w-full p-3 border border-gray-300 rounded-md text-base transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" placeholder="Enter text here">
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="test-select">Test Select</label>
-                    <select id="test-select" class="form-control">
+                <div class="mb-4">
+                    <label class="block mb-2 font-medium text-gray-900" for="test-select">Test Select</label>
+                    <select id="test-select" class="w-full p-3 border border-gray-300 rounded-md text-base transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
                         <option>Option 1</option>
                         <option>Option 2</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="test-textarea">Test Textarea</label>
-                    <textarea id="test-textarea" class="form-control" rows="3" placeholder="Enter longer text here"></textarea>
+                <div class="mb-4">
+                    <label class="block mb-2 font-medium text-gray-900" for="test-textarea">Test Textarea</label>
+                    <textarea id="test-textarea" class="w-full p-3 border border-gray-300 rounded-md text-base transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" rows="3" placeholder="Enter longer text here"></textarea>
                 </div>
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Dashboard Preview</h2>
-            <div class="dashboard-preview">
-                <div class="dashboard-card">
-                    <h3>Dashboard Card</h3>
-                    <p>This simulates how dashboard components look with the new design system.</p>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Dashboard Preview</h2>
+            <div class="bg-gray-100 rounded-lg p-4 mt-4">
+                <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+                    <h3 class="text-xl font-semibold mb-2">Dashboard Card</h3>
+                    <p class="text-gray-600 mb-4">This simulates how dashboard components look with the new design system.</p>
                     <button class="btn btn-primary">Dashboard Action</button>
                 </div>
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Responsive Test</h2>
-            <p>Resize your browser window to see different colors:</p>
-            <div class="responsive-test">
-                <div class="responsive-box">Desktop: Blue</div>
-                <div class="responsive-box">Tablet: Orange</div>
-                <div class="responsive-box">Mobile: Red</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Responsive Test</h2>
+            <p class="mb-4">Resize your browser window to see different colors:</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-blue-100 border border-blue-500 rounded-md p-4 text-center md:bg-orange-100 md:border-orange-500 sm:bg-red-100 sm:border-red-500">Desktop: Blue</div>
+                <div class="bg-blue-100 border border-blue-500 rounded-md p-4 text-center md:bg-orange-100 md:border-orange-500 sm:bg-red-100 sm:border-red-500">Tablet: Orange</div>
+                <div class="bg-blue-100 border border-blue-500 rounded-md p-4 text-center md:bg-orange-100 md:border-orange-500 sm:bg-red-100 sm:border-red-500">Mobile: Red</div>
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Accessibility Test</h2>
-            <div class="accessibility-test">
-                <p>Tab through these elements to test focus styles:</p>
-                <button class="focus-test">Focusable Button 1</button>
-                <button class="focus-test">Focusable Button 2</button>
-                <a href="#" class="focus-test">Focusable Link</a>
-                <input type="text" class="focus-test" placeholder="Focusable Input">
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Accessibility Test</h2>
+            <div class="mt-6">
+                <p class="mb-4">Tab through these elements to test focus styles:</p>
+                <button class="p-3 m-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20">Focusable Button 1</button>
+                <button class="p-3 m-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20">Focusable Button 2</button>
+                <a href="#" class="p-3 m-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20 inline-block">Focusable Link</a>
+                <input type="text" class="p-3 m-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Focusable Input">
             </div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Status Messages</h2>
-            <div class="status-message success">✅ Success: Design system applied successfully!</div>
-            <div class="status-message warning">⚠️ Warning: Some legacy styles may still exist</div>
-            <div class="status-message error">❌ Error: Inconsistent styling detected</div>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Status Messages</h2>
+            <div class="bg-success-light text-success border border-success p-4 rounded-md my-2 font-medium">✅ Success: Design system applied successfully!</div>
+            <div class="bg-warning-light text-warning border border-warning p-4 rounded-md my-2 font-medium">⚠️ Warning: Some legacy styles may still exist</div>
+            <div class="bg-accent-light text-accent border border-accent p-4 rounded-md my-2 font-medium">❌ Error: Inconsistent styling detected</div>
         </div>
         
-        <div class="test-section">
-            <h2 class="test-title">Test Results</h2>
-            <div class="status-message success">
-                ✅ All components now use the unified design system variables<br>
+        <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6 shadow-sm">
+            <h2 class="text-2xl font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">Test Results</h2>
+            <div class="bg-success-light text-success border border-success p-4 rounded-md font-medium">
+                ✅ All components now use Tailwind utility classes<br>
                 ✅ Color scheme is consistent across dashboard and main site<br>
-                ✅ Typography scale uses consistent rem units<br>
-                ✅ Spacing follows the standardized scale<br>
-                ✅ Button styles are unified<br>
+                ✅ Typography scale uses consistent Tailwind classes<br>
+                ✅ Spacing follows the standardized Tailwind scale<br>
+                ✅ Button styles are unified with component classes<br>
                 ✅ Form elements have consistent styling<br>
                 ✅ Focus states provide proper accessibility<br>
                 ✅ Responsive design works across screen sizes

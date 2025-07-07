@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import './styles/variables.css';
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+  
+  body {
+    @apply m-0 font-sans antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    line-height: var(--line-height-normal);
+    color: var(--text-primary);
+    background-color: var(--bg-primary);
+  }
+
+  code {
+    @apply font-mono;
+  }
+}
+
+@layer components {
+  /* Container */
+  .container {
+    @apply max-w-container-max mx-auto px-4;
+  }
+
+  /* Button Components */
+  .btn {
+    @apply px-6 py-3 border-0 rounded-lg cursor-pointer text-base font-semibold no-underline inline-block text-center transition-all duration-[250ms] leading-tight;
+  }
+
+  .btn:focus {
+    @apply outline-none ring-2 ring-primary ring-opacity-10;
+  }
+
+  .btn-primary {
+    @apply bg-primary text-white hover:bg-primary-hover active:bg-primary-active;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-white hover:bg-secondary-hover;
+  }
+
+  .btn-danger {
+    @apply bg-accent text-white hover:bg-accent-hover;
+  }
+
+  /* Card Components */
+  .card {
+    @apply bg-white border border-gray-200 rounded-xl p-6 shadow-sm transition-all duration-[250ms] hover:shadow-md;
+  }
+
+  .card-header {
+    @apply mb-4 pb-4 border-b border-gray-100;
+  }
+
+  .card-title {
+    @apply text-lg font-semibold text-gray-900 m-0;
+  }
+
+  .card-body {
+    @apply text-gray-600;
+  }
+
+  /* Form Components */
+  .form-group {
+    @apply mb-4;
+  }
+
+  .form-label {
+    @apply block mb-2 font-medium text-gray-900;
+  }
+
+  .form-control {
+    @apply w-full px-3 py-3 border border-gray-200 rounded-md text-base font-sans transition-all duration-[250ms] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-10 placeholder-gray-400;
+  }
+
+  /* Utility Classes */
+  .text-primary { @apply text-text-primary; }
+  .text-secondary { @apply text-text-secondary; }
+  .text-muted { @apply text-text-muted; }
+
+  .bg-primary { @apply bg-bg-primary; }
+  .bg-secondary { @apply bg-bg-secondary; }
+  .bg-tertiary { @apply bg-bg-tertiary; }
+
+}
