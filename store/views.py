@@ -5,6 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.db.models import Q, Count, Sum
 from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
@@ -454,6 +455,7 @@ def dashboard_stats(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@csrf_exempt
 def register(request):
     serializer = UserSerializer(data=request.data)
     if serializer.is_valid():
@@ -480,6 +482,7 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@csrf_exempt
 def login_view(request):
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():

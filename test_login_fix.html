@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login Fix Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <h1>Login Fix Test</h1>
+    <div id="result"></div>
+    
+    <script>
+        // Configure axios similar to the frontend
+        const api = axios.create({
+            baseURL: 'http://localhost:8000',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            withCredentials: true,
+            timeout: 10000,
+        });
+
+        // Test login
+        async function testLogin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing login...';
+            
+            try {
+                const response = await api.post('/api/login/', {
+                    username: 'testuser',
+                    password: 'testpass123'
+                });
+                
+                resultDiv.innerHTML = `
+                    <h2>✅ LOGIN SUCCESS!</h2>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Token:</strong> ${response.data.token.substring(0, 20)}...</p>
+                    <p><strong>User:</strong> ${response.data.user.username}</p>
+                    <p><strong>Email:</strong> ${response.data.user.email}</p>
+                    <h3>Full Response:</h3>
+                    <pre>${JSON.stringify(response.data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h2>❌ LOGIN FAILED</h2>
+                    <p><strong>Status:</strong> ${error.response?.status || 'Network Error'}</p>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <h3>Error Details:</h3>
+                    <pre>${JSON.stringify(error.response?.data || error.message, null, 2)}</pre>
+                `;
+            }
+        }
+        
+        // Run test when page loads
+        window.onload = testLogin;
+    </script>
+</body>
+</html>
