@@ -296,6 +296,11 @@ STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 # Shippo settings
 SHIPPO_API_KEY = os.getenv('SHIPPO_API_KEY')
 
+# Webhook security settings
+WEBHOOK_MAX_PAYLOAD_SIZE = int(os.getenv('WEBHOOK_MAX_PAYLOAD_SIZE', '1048576'))  # 1MB default
+WEBHOOK_SIGNATURE_TOLERANCE = int(os.getenv('WEBHOOK_SIGNATURE_TOLERANCE', '300'))  # 5 minutes default
+WEBHOOK_MAX_PROCESSING_ATTEMPTS = int(os.getenv('WEBHOOK_MAX_PROCESSING_ATTEMPTS', '3'))  # 3 attempts default
+
 # Security settings
 SECURE_BROWSER_XSS_FILTER = os.getenv('SECURE_BROWSER_XSS_FILTER', 'True').lower() == 'true'
 SECURE_CONTENT_TYPE_NOSNIFF = os.getenv('SECURE_CONTENT_TYPE_NOSNIFF', 'True').lower() == 'true'
