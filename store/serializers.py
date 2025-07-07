@@ -174,6 +174,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['id', 'order_id', 'order_date', 'status', 'total_price', 
                  'shipping_cost', 'shipping_method', 'tracking_number',
+                 'shipping_rate_id', 'shipping_carrier', 'shipping_service', 'shipping_estimated_days',
                  'items', 'shipping_address', 'is_archived', 'archived_at']
         read_only_fields = ['order_id', 'order_date', 'is_archived', 'archived_at']
 
@@ -231,6 +232,10 @@ class CartSerializer(serializers.ModelSerializer):
 class CheckoutSerializer(serializers.Serializer):
     shipping_address_id = serializers.IntegerField()
     shipping_rate_id = serializers.CharField(required=False, allow_blank=True)
+    shipping_carrier = serializers.CharField(required=False, allow_blank=True)
+    shipping_service = serializers.CharField(required=False, allow_blank=True)
+    shipping_cost = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    shipping_estimated_days = serializers.IntegerField(required=False)
     
     def validate_shipping_address_id(self, value):
         try:
@@ -242,4 +247,9 @@ class CheckoutSerializer(serializers.Serializer):
     def validate_shipping_rate_id(self, value):
         if value and not value.startswith('shippo_'):
             raise serializers.ValidationError("Invalid shipping rate ID format")
+        return value
+    
+    def validate_shipping_cost(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Shipping cost cannot be negative")
         return value

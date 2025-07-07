@@ -49,6 +49,13 @@ def create_checkout_session(request):
             customer=customer
         )
         
+        # Extract shipping rate information from request
+        shipping_rate_id = serializer.validated_data.get('shipping_rate_id')
+        shipping_carrier = serializer.validated_data.get('shipping_carrier')
+        shipping_service = serializer.validated_data.get('shipping_service')
+        shipping_cost = serializer.validated_data.get('shipping_cost', 0)
+        shipping_estimated_days = serializer.validated_data.get('shipping_estimated_days')
+        
         # Check stock availability
         for item in cart.items.all():
             if item.product.stock_quantity < item.quantity:
@@ -91,6 +98,29 @@ def create_checkout_session(request):
                 'quantity': item.quantity,
             })
         
+        # Add shipping as line item if shipping rate is provided
+        if shipping_cost and shipping_cost > 0:
+            shipping_line_item = {
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': f'Shipping - {shipping_carrier} {shipping_service}' if shipping_carrier and shipping_service else 'Shipping',
+                        'description': f'Estimated delivery: {shipping_estimated_days} days' if shipping_estimated_days else 'Standard shipping',
+                        'metadata': {
+                            'type': 'shipping',
+                            'rate_id': shipping_rate_id or '',
+                            'carrier': shipping_carrier or '',
+                            'service': shipping_service or '',
+                            'estimated_days': str(shipping_estimated_days) if shipping_estimated_days else ''
+                        }
+                    },
+                    'unit_amount': int(shipping_cost * 100),  # Convert to cents
+                    'tax_behavior': 'exclusive',
+                },
+                'quantity': 1,
+            }
+            line_items.append(shipping_line_item)
+        
         # Create Stripe customer for better experience and data management
         stripe_customer = None
         try:
@@ -130,7 +160,12 @@ def create_checkout_session(request):
                 'shipping_address_id': str(shipping_address.id),
                 'cart_total': str(cart.total_price),
                 'order_type': '3d_print_products',
-                'source': 'web_checkout'
+                'source': 'web_checkout',
+                'shipping_rate_id': shipping_rate_id or '',
+                'shipping_carrier': shipping_carrier or '',
+                'shipping_service': shipping_service or '',
+                'shipping_cost': str(shipping_cost) if shipping_cost else '0',
+                'shipping_estimated_days': str(shipping_estimated_days) if shipping_estimated_days else ''
             }
         }
         
@@ -142,6 +177,49 @@ def create_checkout_session(request):
         
         # Create the checkout session
         checkout_session = stripe.checkout.Session.create(**session_params)
+        
+        # Create a pending order immediately to ensure we have a record
+        # This will be updated by the webhook when payment is confirmed
+        try:
+            # Calculate total amount
+            total_amount = sum(item.total_price for item in cart.items.all())
+            
+            # Calculate total including shipping
+            total_with_shipping = total_amount + (shipping_cost if shipping_cost else 0)
+            
+            # Create pending order
+            pending_order = Order.objects.create(
+                customer=customer,
+                total_price=total_with_shipping,
+                shipping_address=shipping_address,
+                stripe_checkout_session_id=checkout_session.id,
+                stripe_payment_intent_id='',  # Will be updated by webhook
+                status='pending',
+                shipping_cost=shipping_cost if shipping_cost else 0,
+                shipping_method=f'{shipping_carrier} {shipping_service}' if shipping_carrier and shipping_service else '',
+                shipping_rate_id=shipping_rate_id or '',
+                shipping_carrier=shipping_carrier or '',
+                shipping_service=shipping_service or '',
+                shipping_estimated_days=shipping_estimated_days
+            )
+            
+            # Create order items
+            for cart_item in cart.items.all():
+                OrderItem.objects.create(
+                    order=pending_order,
+                    product=cart_item.product,
+                    quantity=cart_item.quantity,
+                    price=cart_item.product.price
+                )
+            
+            # Clear the cart after successful order creation
+            cart.items.all().delete()
+            
+            logging.getLogger(__name__).info(f"Created pending order {pending_order.order_id} for session {checkout_session.id}")
+            
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Failed to create pending order: {e}")
+            # Don't fail the checkout if order creation fails - webhook will handle it
         
         return Response({
             'checkout_url': checkout_session.url,
@@ -256,6 +334,11 @@ def _process_checkout_session_completed(event_data, webhook_event):
             metadata = session.get('metadata', {})
             customer_id = metadata.get('customer_id')
             shipping_address_id = metadata.get('shipping_address_id')
+            shipping_rate_id = metadata.get('shipping_rate_id', '')
+            shipping_carrier = metadata.get('shipping_carrier', '')
+            shipping_service = metadata.get('shipping_service', '')
+            shipping_cost = metadata.get('shipping_cost', '0')
+            shipping_estimated_days = metadata.get('shipping_estimated_days', '')
             
             if not customer_id or not shipping_address_id:
                 logger.error(f"Missing metadata in checkout session: {session['id']}")
@@ -269,28 +352,62 @@ def _process_checkout_session_completed(event_data, webhook_event):
                 logger.error(f"Customer or shipping address not found: {str(e)}")
                 return None
             
-            # Get the cart
+            # Check if order already exists (created during checkout)
+            existing_order = Order.objects.filter(
+                customer=customer,
+                stripe_checkout_session_id=session['id']
+            ).first()
+            
+            if existing_order:
+                # Order already exists, just update status and payment intent
+                existing_order.stripe_payment_intent_id = session.get('payment_intent', '')
+                existing_order.status = 'processing'
+                
+                # Update shipping information if not already set
+                if not existing_order.shipping_rate_id and shipping_rate_id:
+                    existing_order.shipping_rate_id = shipping_rate_id
+                    existing_order.shipping_carrier = shipping_carrier
+                    existing_order.shipping_service = shipping_service
+                    if shipping_cost:
+                        existing_order.shipping_cost = float(shipping_cost)
+                    if shipping_estimated_days:
+                        existing_order.shipping_estimated_days = int(shipping_estimated_days)
+                    existing_order.shipping_method = f'{shipping_carrier} {shipping_service}'.strip()
+                
+                existing_order.save()
+                
+                logger.info(f"Updated existing order {existing_order.order_id} to processing status")
+                return existing_order
+            
+            # Order doesn't exist, try to create from cart (fallback for webhook-only flow)
             try:
                 cart = Cart.objects.get(customer=customer)
             except Cart.DoesNotExist:
-                logger.error(f"Cart not found for customer {customer_id}")
+                logger.error(f"Cart not found for customer {customer_id} and no existing order")
                 return None
             
             if not cart.items.exists():
-                logger.error(f"Empty cart for customer {customer_id}")
+                logger.error(f"Empty cart for customer {customer_id} and no existing order")
                 return None
             
             # Calculate total amount
             total_amount = sum(item.total_price for item in cart.items.all())
+            total_with_shipping = total_amount + (float(shipping_cost) if shipping_cost else 0)
             
-            # Create order
+            # Create order (fallback case)
             order = Order.objects.create(
                 customer=customer,
-                total_price=total_amount,
+                total_price=total_with_shipping,
                 shipping_address=shipping_address,
                 stripe_checkout_session_id=session['id'],
                 stripe_payment_intent_id=session.get('payment_intent', ''),
-                status='processing'
+                status='processing',
+                shipping_cost=float(shipping_cost) if shipping_cost else 0,
+                shipping_method=f'{shipping_carrier} {shipping_service}'.strip(),
+                shipping_rate_id=shipping_rate_id,
+                shipping_carrier=shipping_carrier,
+                shipping_service=shipping_service,
+                shipping_estimated_days=int(shipping_estimated_days) if shipping_estimated_days else None
             )
             
             # Create order items and update stock
@@ -351,14 +468,41 @@ def order_success(request):
         ).first()
         
         if not order:
-            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+            # Try to verify payment status directly with Stripe as fallback
+            try:
+                checkout_session = stripe.checkout.Session.retrieve(session_id)
+                if checkout_session.payment_status == 'paid':
+                    # Payment was successful but order creation failed
+                    # This suggests a webhook processing issue
+                    return Response({
+                        'order_id': 'PROCESSING',
+                        'status': 'payment_verified',
+                        'total_price': checkout_session.amount_total / 100,  # Convert from cents
+                        'message': 'Payment successful! Your order is being processed. You will receive an email confirmation shortly.'
+                    })
+                else:
+                    return Response({'error': 'Payment not completed'}, status=status.HTTP_400_BAD_REQUEST)
+            except stripe.error.StripeError as e:
+                logging.getLogger(__name__).error(f"Stripe error retrieving session {session_id}: {e}")
+                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Order found - determine appropriate message based on status
+        if order.status == 'pending':
+            message = 'Payment received! Your order is being processed and you will receive an email confirmation shortly.'
+        elif order.status == 'processing':
+            message = 'Payment successful! Your order has been confirmed and is being processed.'
+        elif order.status == 'completed':
+            message = 'Payment successful! Your order has been completed.'
+        else:
+            message = f'Payment successful! Your order status: {order.status}.'
         
         return Response({
             'order_id': order.order_id,
             'status': order.status,
-            'total_price': order.total_price,
-            'message': 'Payment successful! Your order has been created.'
+            'total_price': str(order.total_price),
+            'message': message
         })
         
     except Exception as e:
+        logging.getLogger(__name__).error(f"Error in order_success: {e}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

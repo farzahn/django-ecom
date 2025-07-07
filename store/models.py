@@ -343,6 +343,12 @@ class Order(models.Model):
     shipping_method = models.CharField(max_length=100, blank=True)
     tracking_number = models.CharField(max_length=200, blank=True)
     
+    # GoShippo shipping integration fields
+    shipping_rate_id = models.CharField(max_length=255, blank=True, help_text="GoShippo rate ID")
+    shipping_carrier = models.CharField(max_length=100, blank=True, help_text="Shipping carrier (e.g., USPS, UPS)")
+    shipping_service = models.CharField(max_length=100, blank=True, help_text="Shipping service (e.g., Priority Mail)")
+    shipping_estimated_days = models.IntegerField(null=True, blank=True, help_text="Estimated delivery days")
+    
     # Archive functionality
     is_archived = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
