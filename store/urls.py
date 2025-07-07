@@ -4,7 +4,7 @@ from . import views
 from . import stripe_views
 from . import shipping_views
 
-router = DefaultRouter(trailing_slash=False)
+router = DefaultRouter(trailing_slash=True)
 router.register(r'products', views.ProductViewSet)
 router.register(r'customers', views.CustomerViewSet)
 router.register(r'orders', views.OrderViewSet)
