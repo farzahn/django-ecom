@@ -168,6 +168,14 @@ class Customer(models.Model):
         help_text="Email verification status"
     )
     
+    # Payment integration
+    stripe_customer_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Stripe customer ID for payment processing"
+    )
+    
     # Activity tracking
     last_login = models.DateTimeField(null=True, blank=True)
     total_orders = models.PositiveIntegerField(default=0)

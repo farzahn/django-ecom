@@ -55,33 +55,148 @@ def create_checkout_session(request):
                     'error': f'Not enough stock for {item.product.name}'
                 }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Create line items for Stripe
+        # Create enhanced line items for Stripe (2025 best practices)
         line_items = []
         for item in cart.items.all():
+            # Enhanced product data with additional metadata
+            product_data = {
+                'name': item.product.name,
+                'description': item.product.description[:500],
+                'metadata': {
+                    'product_id': str(item.product.id),
+                    'product_slug': item.product.slug,
+                    'weight': str(item.product.weight),
+                    'dimensions': f"{item.product.length}x{item.product.width}x{item.product.height}"
+                }
+            }
+            
+            # Add product images if available
+            if item.product.images.exists():
+                product_data['images'] = [item.product.images.first().image.url]
+            
             line_items.append({
                 'price_data': {
                     'currency': 'usd',
-                    'product_data': {
-                        'name': item.product.name,
-                        'description': item.product.description[:500],
-                    },
+                    'product_data': product_data,
                     'unit_amount': int(item.product.price * 100),  # Convert to cents
+                    'tax_behavior': 'exclusive',  # 2025 best practice for tax handling
                 },
                 'quantity': item.quantity,
             })
         
-        # Create Stripe checkout session
-        checkout_session = stripe.checkout.Session.create(
-            payment_method_types=['card'],
-            line_items=line_items,
-            mode='payment',
-            success_url=request.build_absolute_uri('/success/') + '?session_id={CHECKOUT_SESSION_ID}',
-            cancel_url=request.build_absolute_uri('/cancel/'),
-            metadata={
-                'customer_id': customer.id,
-                'shipping_address_id': shipping_address.id,
+        # Create Stripe customer for better experience and data management
+        stripe_customer = None
+        try:
+            if customer.stripe_customer_id:
+                stripe_customer = stripe.Customer.retrieve(customer.stripe_customer_id)
+            else:
+                stripe_customer = stripe.Customer.create(
+                    email=customer.user.email,
+                    name=f"{customer.user.first_name} {customer.user.last_name}".strip(),
+                    metadata={
+                        'customer_id': str(customer.id),
+                        'username': customer.user.username
+                    }
+                )
+                customer.stripe_customer_id = stripe_customer.id
+                customer.save()
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Failed to create/retrieve Stripe customer: {e}")
+        
+        # Enhanced checkout session with 2025 best practices
+        session_params = {
+            'payment_method_types': ['card'],
+            'line_items': line_items,
+            'mode': 'payment',
+            'success_url': 'http://localhost:3000/success?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url': 'http://localhost:3000/cancel',
+            'metadata': {
+                'customer_id': str(customer.id),
+                'shipping_address_id': str(shipping_address.id),
+                'cart_total': str(cart.total_price),
+                'order_type': '3d_print_products',
+                'source': 'web_checkout'
+            },
+            'shipping_address_collection': {
+                'allowed_countries': ['US', 'CA'],  # Configurable based on business needs
+            },
+            'shipping_options': [
+                {
+                    'shipping_rate_data': {
+                        'type': 'fixed_amount',
+                        'fixed_amount': {
+                            'amount': 999,  # $9.99 standard shipping
+                            'currency': 'usd',
+                        },
+                        'display_name': 'Standard Shipping',
+                        'delivery_estimate': {
+                            'minimum': {
+                                'unit': 'business_day',
+                                'value': 5,
+                            },
+                            'maximum': {
+                                'unit': 'business_day',
+                                'value': 7,
+                            },
+                        },
+                    },
+                },
+                {
+                    'shipping_rate_data': {
+                        'type': 'fixed_amount',
+                        'fixed_amount': {
+                            'amount': 1999,  # $19.99 express shipping
+                            'currency': 'usd',
+                        },
+                        'display_name': 'Express Shipping',
+                        'delivery_estimate': {
+                            'minimum': {
+                                'unit': 'business_day',
+                                'value': 1,
+                            },
+                            'maximum': {
+                                'unit': 'business_day',
+                                'value': 3,
+                            },
+                        },
+                    },
+                },
+            ],
+            'phone_number_collection': {
+                'enabled': True
+            },
+            'custom_text': {
+                'shipping_address': {
+                    'message': 'Please provide accurate shipping information for your 3D printed items.'
+                },
+                'submit': {
+                    'message': 'We\'ll email you instructions on how to track your order.'
+                }
+            },
+            'invoice_creation': {
+                'enabled': True,
+                'invoice_data': {
+                    'description': f'PasargadPrints Order - {cart.total_items} items',
+                    'metadata': {
+                        'customer_id': str(customer.id),
+                        'order_date': cart.created_at.isoformat()
+                    },
+                    'footer': 'Thank you for your business with PasargadPrints!'
+                }
+            },
+            'consent_collection': {
+                'terms_of_service': 'required'
             }
-        )
+        }
+        
+        # Add customer if available
+        if stripe_customer:
+            session_params['customer'] = stripe_customer.id
+        else:
+            session_params['customer_email'] = customer.user.email
+        
+        # Create the enhanced checkout session
+        checkout_session = stripe.checkout.Session.create(**session_params)
         
         return Response({
             'checkout_url': checkout_session.url,

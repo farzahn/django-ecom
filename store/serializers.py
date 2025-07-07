@@ -230,10 +230,16 @@ class CartSerializer(serializers.ModelSerializer):
 
 class CheckoutSerializer(serializers.Serializer):
     shipping_address_id = serializers.IntegerField()
+    shipping_rate_id = serializers.CharField(required=False, allow_blank=True)
     
     def validate_shipping_address_id(self, value):
         try:
             address = ShippingAddress.objects.get(id=value)
         except ShippingAddress.DoesNotExist:
             raise serializers.ValidationError("Shipping address not found")
+        return value
+    
+    def validate_shipping_rate_id(self, value):
+        if value and not value.startswith('shippo_'):
+            raise serializers.ValidationError("Invalid shipping rate ID format")
         return value
