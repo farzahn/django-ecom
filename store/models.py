@@ -109,10 +109,7 @@ class Customer(models.Model):
         ],
         help_text="Profile picture (max 5MB, jpg/jpeg/png/gif only)"
     )
-    bio = models.TextField(max_length=500, blank=True, help_text="Short bio or description")
     website = models.URLField(blank=True, help_text="Personal or business website")
-    company = models.CharField(max_length=100, blank=True, help_text="Company name")
-    job_title = models.CharField(max_length=100, blank=True, help_text="Job title or profession")
     
     # Address fields
     address_line_1 = models.CharField(max_length=255, blank=True)
@@ -452,3 +449,246 @@ class CartItem(models.Model):
     @property
     def total_price(self):
         return self.quantity * self.product.price
+
+
+class WebhookEvent(models.Model):
+    """Model to track webhook events for idempotency and auditing"""
+    
+    WEBHOOK_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('processed', 'Processed'),
+        ('failed', 'Failed'),
+        ('duplicate', 'Duplicate'),
+    ]
+    
+    WEBHOOK_TYPE_CHOICES = [
+        ('stripe.checkout.session.completed', 'Stripe Checkout Session Completed'),
+        ('stripe.payment_intent.succeeded', 'Stripe Payment Intent Succeeded'),
+        ('stripe.payment_intent.payment_failed', 'Stripe Payment Intent Failed'),
+        ('stripe.invoice.payment_succeeded', 'Stripe Invoice Payment Succeeded'),
+        ('stripe.customer.created', 'Stripe Customer Created'),
+        ('stripe.customer.updated', 'Stripe Customer Updated'),
+        ('other', 'Other'),
+    ]
+    
+    # Event identification
+    event_id = models.CharField(max_length=255, unique=True, db_index=True)
+    event_type = models.CharField(max_length=50, choices=WEBHOOK_TYPE_CHOICES)
+    source = models.CharField(max_length=50, default='stripe')
+    
+    # Processing status
+    status = models.CharField(max_length=20, choices=WEBHOOK_STATUS_CHOICES, default='pending')
+    
+    # Event data
+    payload_hash = models.CharField(max_length=64, db_index=True)  # SHA256 hash of payload
+    payload_size = models.PositiveIntegerField()
+    api_version = models.CharField(max_length=50, blank=True)
+    
+    # Processing metadata
+    processing_attempts = models.PositiveIntegerField(default=0)
+    first_attempt_at = models.DateTimeField(null=True, blank=True)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Related objects
+    related_order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True, blank=True)
+    related_customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Error tracking
+    error_message = models.TextField(blank=True)
+    error_count = models.PositiveIntegerField(default=0)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['event_id', 'status']),
+            models.Index(fields=['event_type', 'created_at']),
+            models.Index(fields=['payload_hash']),
+            models.Index(fields=['source', 'status']),
+        ]
+    
+    def __str__(self):
+        return f"{self.event_type} - {self.event_id}"
+    
+    def mark_as_processing(self):
+        """Mark webhook event as being processed"""
+        from django.utils import timezone
+        self.status = 'processing'
+        self.processing_attempts += 1
+        self.last_attempt_at = timezone.now()
+        if not self.first_attempt_at:
+            self.first_attempt_at = self.last_attempt_at
+        self.save(update_fields=['status', 'processing_attempts', 'last_attempt_at', 'first_attempt_at'])
+    
+    def mark_as_processed(self, related_order=None, related_customer=None):
+        """Mark webhook event as successfully processed"""
+        from django.utils import timezone
+        self.status = 'processed'
+        self.processed_at = timezone.now()
+        if related_order:
+            self.related_order = related_order
+        if related_customer:
+            self.related_customer = related_customer
+        self.save(update_fields=['status', 'processed_at', 'related_order', 'related_customer'])
+    
+    def mark_as_failed(self, error_message):
+        """Mark webhook event as failed"""
+        self.status = 'failed'
+        self.error_message = error_message
+        self.error_count += 1
+        self.save(update_fields=['status', 'error_message', 'error_count'])
+    
+    def mark_as_duplicate(self):
+        """Mark webhook event as duplicate"""
+        self.status = 'duplicate'
+        self.save(update_fields=['status'])
+    
+    def is_processable(self):
+        """Check if webhook event can be processed"""
+        return self.status in ['pending', 'failed'] and self.processing_attempts < 3
+    
+    def get_retry_delay(self):
+        """Get delay before retry in seconds (exponential backoff)"""
+        if self.processing_attempts == 0:
+            return 0
+        return min(300, 2 ** self.processing_attempts)  # Max 5 minutes
+
+
+class WebhookSecurityLog(models.Model):
+    """Model to track webhook security events and potential threats"""
+    
+    SECURITY_EVENT_TYPES = [
+        ('signature_verification_failed', 'Signature Verification Failed'),
+        ('invalid_payload', 'Invalid Payload'),
+        ('rate_limit_exceeded', 'Rate Limit Exceeded'),
+        ('suspicious_activity', 'Suspicious Activity'),
+        ('unauthorized_access', 'Unauthorized Access'),
+        ('malformed_request', 'Malformed Request'),
+        ('duplicate_event', 'Duplicate Event'),
+        ('processing_error', 'Processing Error'),
+        ('success', 'Success'),
+    ]
+    
+    SEVERITY_LEVELS = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('critical', 'Critical'),
+    ]
+    
+    # Event identification
+    event_type = models.CharField(max_length=50, choices=SECURITY_EVENT_TYPES)
+    severity = models.CharField(max_length=20, choices=SEVERITY_LEVELS, default='medium')
+    
+    # Request details
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    request_method = models.CharField(max_length=10, default='POST')
+    request_path = models.CharField(max_length=255, blank=True)
+    
+    # Webhook specific details
+    webhook_source = models.CharField(max_length=50, default='stripe')
+    webhook_event_id = models.CharField(max_length=255, blank=True)
+    webhook_event_type = models.CharField(max_length=50, blank=True)
+    
+    # Security details
+    signature_valid = models.BooleanField(null=True, blank=True)
+    payload_size = models.PositiveIntegerField(null=True, blank=True)
+    payload_hash = models.CharField(max_length=64, blank=True)
+    
+    # Error details
+    error_message = models.TextField(blank=True)
+    error_code = models.CharField(max_length=50, blank=True)
+    
+    # Additional context
+    metadata = models.JSONField(default=dict, blank=True)
+    
+    # Timestamps
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['event_type', 'severity']),
+            models.Index(fields=['ip_address', 'timestamp']),
+            models.Index(fields=['webhook_source', 'event_type']),
+            models.Index(fields=['timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.event_type} - {self.severity} - {self.timestamp}"
+    
+    @classmethod
+    def log_security_event(cls, event_type, severity='medium', ip_address=None, user_agent='', 
+                          webhook_source='stripe', webhook_event_id='', webhook_event_type='',
+                          signature_valid=None, payload_size=None, payload_hash='',
+                          error_message='', error_code='', metadata=None, request_method='POST',
+                          request_path=''):
+        """Create a security log entry"""
+        return cls.objects.create(
+            event_type=event_type,
+            severity=severity,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            request_method=request_method,
+            request_path=request_path,
+            webhook_source=webhook_source,
+            webhook_event_id=webhook_event_id,
+            webhook_event_type=webhook_event_type,
+            signature_valid=signature_valid,
+            payload_size=payload_size,
+            payload_hash=payload_hash,
+            error_message=error_message,
+            error_code=error_code,
+            metadata=metadata or {}
+        )
+    
+    @classmethod
+    def log_success(cls, ip_address=None, user_agent='', webhook_event_id='', 
+                   webhook_event_type='', payload_size=None, payload_hash=''):
+        """Log successful webhook processing"""
+        return cls.log_security_event(
+            event_type='success',
+            severity='low',
+            ip_address=ip_address,
+            user_agent=user_agent,
+            webhook_event_id=webhook_event_id,
+            webhook_event_type=webhook_event_type,
+            signature_valid=True,
+            payload_size=payload_size,
+            payload_hash=payload_hash
+        )
+    
+    @classmethod
+    def log_signature_failure(cls, ip_address=None, user_agent='', error_message='',
+                             payload_size=None, payload_hash=''):
+        """Log signature verification failure"""
+        return cls.log_security_event(
+            event_type='signature_verification_failed',
+            severity='high',
+            ip_address=ip_address,
+            user_agent=user_agent,
+            signature_valid=False,
+            payload_size=payload_size,
+            payload_hash=payload_hash,
+            error_message=error_message
+        )
+    
+    @classmethod
+    def log_duplicate_event(cls, ip_address=None, user_agent='', webhook_event_id='',
+                           webhook_event_type='', payload_hash=''):
+        """Log duplicate event detection"""
+        return cls.log_security_event(
+            event_type='duplicate_event',
+            severity='medium',
+            ip_address=ip_address,
+            user_agent=user_agent,
+            webhook_event_id=webhook_event_id,
+            webhook_event_type=webhook_event_type,
+            payload_hash=payload_hash
+        )
