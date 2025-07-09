@@ -101,7 +101,9 @@ jobs:
     needs: build-deployment
     if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
     
-    environment: staging
+    environment:
+      name: staging
+      url: https://staging.pasargadprints.com
     
     steps:
     - name: Download deployment package
@@ -139,7 +141,9 @@ jobs:
     needs: [build-deployment, deploy-staging]
     if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
     
-    environment: production
+    environment:
+      name: production
+      url: https://pasargadprints.com
     
     steps:
     - name: Download deployment package
@@ -233,7 +237,9 @@ jobs:
     if: failure()
     needs: deploy-production
     
-    environment: production
+    environment:
+      name: production
+      url: https://pasargadprints.com
     
     steps:
     - name: Rollback production deployment

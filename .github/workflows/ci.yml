@@ -266,7 +266,9 @@ jobs:
     needs: [e2e-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
-    environment: production
+    environment:
+      name: production
+      url: https://pasargadprints.com
     
     steps:
     - uses: actions/checkout@v4
