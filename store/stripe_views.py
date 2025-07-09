@@ -1,6 +1,7 @@
 import stripe
 import logging
 import os
+from decimal import Decimal
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -369,7 +370,7 @@ def _process_checkout_session_completed(event_data, webhook_event):
             ).first()
             
             if existing_order:
-                # Order already exists, just update status and payment intent
+                # Order already exists, update status and payment intent
                 existing_order.stripe_payment_intent_id = session.get('payment_intent', '')
                 existing_order.status = 'processing'
                 
@@ -385,6 +386,36 @@ def _process_checkout_session_completed(event_data, webhook_event):
                     existing_order.shipping_method = f'{shipping_carrier} {shipping_service}'.strip()
                 
                 existing_order.save()
+                
+                # Deduct stock for each order item only if not already deducted
+                if not existing_order.stock_deducted:
+                    insufficient_stock_items = []
+                    for order_item in existing_order.items.all():
+                        product = order_item.product
+                        
+                        # Check if we have enough stock
+                        if product.stock_quantity >= order_item.quantity:
+                            # Deduct stock
+                            product.stock_quantity -= order_item.quantity
+                            product.save()
+                            logger.info(f"Deducted {order_item.quantity} units of {product.name} from stock. New stock: {product.stock_quantity}")
+                        else:
+                            # Not enough stock - this shouldn't happen if checkout validation worked
+                            insufficient_stock_items.append(f"{product.name} (requested: {order_item.quantity}, available: {product.stock_quantity})")
+                            logger.error(f"Insufficient stock for {product.name}: requested {order_item.quantity}, available {product.stock_quantity}")
+                    
+                    # If there were stock issues, mark order for review
+                    if insufficient_stock_items:
+                        existing_order.status = 'requires_action'
+                        existing_order.save()
+                        logger.warning(f"Order {existing_order.order_id} requires action due to insufficient stock: {', '.join(insufficient_stock_items)}")
+                    else:
+                        # Mark stock as deducted
+                        existing_order.stock_deducted = True
+                        existing_order.save()
+                        logger.info(f"Stock deduction completed for order {existing_order.order_id}")
+                else:
+                    logger.info(f"Stock already deducted for order {existing_order.order_id}")
                 
                 logger.info(f"Updated existing order {existing_order.order_id} to processing status")
                 return existing_order
@@ -402,7 +433,7 @@ def _process_checkout_session_completed(event_data, webhook_event):
             
             # Calculate total amount
             total_amount = sum(item.total_price for item in cart.items.all())
-            total_with_shipping = total_amount + (float(shipping_cost) if shipping_cost else 0)
+            total_with_shipping = total_amount + (Decimal(shipping_cost) if shipping_cost else Decimal('0'))
             
             # Create order (fallback case)
             order = Order.objects.create(
@@ -449,8 +480,13 @@ def _process_checkout_session_completed(event_data, webhook_event):
                 # Don't clear the cart for cancelled orders
                 return order
             
+            # Mark stock as deducted since we successfully processed all items
+            order.stock_deducted = True
+            order.save()
+            
             # Clear the cart only if order was successful
             cart.items.all().delete()
+            cart.delete()
             
             # Update customer statistics
             customer.update_activity_stats()

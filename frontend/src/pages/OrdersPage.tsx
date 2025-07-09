@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/useStore';
 import { ordersAPI } from '../services/api';
-
-interface Order {
-  id: number;
-  order_id: string;
-  order_date: string;
-  status: string;
-  total_price: string;
-  items: any[];
-}
+import { Order } from '../types';
 
 const OrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -22,7 +14,9 @@ const OrdersPage: React.FC = () => {
     const fetchOrders = async () => {
       try {
         const response = await ordersAPI.getOrders();
-        setOrders(response.data.results || response.data || []);
+        // Handle paginated response from DRF
+        const ordersData = response.data.results || [];
+        setOrders(ordersData);
       } catch (error) {
         console.error('Failed to fetch orders:', error);
         setOrders([]);
@@ -67,62 +61,19 @@ const OrdersPage: React.FC = () => {
   }
 
   return (
-    <div style={{ 
-      padding: 'var(--space-6)', 
-      maxWidth: 'var(--container-max)', 
-      margin: '0 auto' 
-    }}>
-      <div style={{
-        background: 'var(--bg-primary)',
-        borderRadius: 'var(--radius-xl)',
-        padding: 'var(--space-6)',
-        boxShadow: 'var(--shadow-base)',
-        border: '1px solid var(--border-color)'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: 'var(--space-6)',
-          paddingBottom: 'var(--space-3)',
-          borderBottom: '1px solid var(--border-light)'
-        }}>
-          <h1 style={{ 
-            fontSize: 'var(--font-size-2xl)',
-            fontWeight: 'var(--font-weight-bold)',
-            color: 'var(--text-primary)',
-            margin: 0
-          }}>
-            Order History
-          </h1>
-        </div>
+    <div className="dashboard-card">
+      <div className="dashboard-card-body">
 
         {orders.length === 0 ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: 'var(--space-8)',
-            color: 'var(--text-secondary)'
-          }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              margin: '0 auto var(--space-4)',
-              opacity: 0.5
-            }}>
+          <div className="dashboard-empty">
+            <div className="dashboard-empty-icon">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
               </svg>
             </div>
-            <h3 style={{ 
-              fontSize: 'var(--font-size-lg)',
-              fontWeight: 'var(--font-weight-medium)',
-              color: 'var(--text-primary)',
-              margin: '0 0 var(--space-2)'
-            }}>
-              No Orders Found
-            </h3>
-            <p style={{ fontSize: 'var(--font-size-base)', margin: 0 }}>
+            <h4 className="dashboard-empty-title">No Orders Found</h4>
+            <p className="dashboard-empty-text">
               You haven't placed any orders yet. Start shopping to see your orders here!
             </p>
           </div>
@@ -178,7 +129,7 @@ const OrdersPage: React.FC = () => {
                     <strong>Total:</strong> ${order.total_price}
                   </div>
                   <div>
-                    <strong>Items:</strong> {order.items?.length || 0}
+                    <strong>Items:</strong> {order.items.reduce((total, item) => total + item.quantity, 0)}
                   </div>
                 </div>
               </div>

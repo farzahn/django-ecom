@@ -1,0 +1,122 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # Quick validation for pull requests
+  validate-pr:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 black isort
+    
+    - name: Install Node.js dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Run Python linting
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        black --check .
+        isort --check-only .
+    
+    - name: Run TypeScript type checking
+      working-directory: ./frontend
+      run: npx tsc --noEmit
+    
+    - name: Run ESLint
+      working-directory: ./frontend
+      run: npx eslint src --ext .ts,.tsx --max-warnings 0
+    
+    - name: Run quick tests
+      run: |
+        echo "DEBUG=True" >> .env
+        echo "SECRET_KEY=test-secret-key-for-ci" >> .env
+        echo "DATABASE_URL=sqlite:///db.sqlite3" >> .env
+        echo "STRIPE_PUBLISHABLE_KEY=pk_test_mock" >> .env
+        echo "STRIPE_SECRET_KEY=sk_test_mock" >> .env
+        echo "STRIPE_WEBHOOK_SECRET=whsec_mock" >> .env
+        echo "GOSHIPPO_API_TOKEN=shippo_test_mock" >> .env
+        echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
+        echo "CORS_ALLOWED_ORIGINS=http://localhost:3000" >> .env
+        python manage.py check
+        python manage.py test --verbosity=1 --parallel
+    
+    - name: Run frontend tests
+      working-directory: ./frontend
+      run: npm test -- --watchAll=false
+    
+    - name: Check for potential merge conflicts
+      run: |
+        git fetch origin ${{ github.base_ref }}
+        git merge-tree $(git merge-base HEAD origin/${{ github.base_ref }}) HEAD origin/${{ github.base_ref }} | head -20
+    
+    - name: Comment PR status
+      uses: actions/github-script@v6
+      if: always()
+      with:
+        script: |
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          const botComment = comments.find(comment => 
+            comment.user.login === 'github-actions[bot]' && 
+            comment.body.includes('🤖 PR Validation Status')
+          );
+          
+          const status = '${{ job.status }}';
+          const emoji = status === 'success' ? '✅' : '❌';
+          const message = status === 'success' ? 'All checks passed!' : 'Some checks failed. Please review the logs.';
+          
+          const body = `🤖 PR Validation Status: ${emoji} ${message}
+          
+          **Validation Results:**
+          - Python linting: ${status === 'success' ? '✅' : '❌'}
+          - TypeScript checking: ${status === 'success' ? '✅' : '❌'}
+          - Backend tests: ${status === 'success' ? '✅' : '❌'}
+          - Frontend tests: ${status === 'success' ? '✅' : '❌'}
+          
+          ${status === 'failure' ? '⚠️ Please fix the issues before merging.' : '🎉 Ready for review!'}`;
+          
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+          }

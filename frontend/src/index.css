@@ -88,4 +88,15 @@
   .bg-secondary { @apply bg-bg-secondary; }
   .bg-tertiary { @apply bg-bg-tertiary; }
 
+  /* Loading Spinner */
+  .dashboard-loading-spinner {
+    @apply w-8 h-8 border-4 border-gray-300 border-t-primary rounded-full;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
 }

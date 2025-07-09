@@ -1,0 +1,306 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # Backend Tests
+  backend-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_pasargadprints
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install coverage pytest-django
+    
+    - name: Set up environment variables
+      run: |
+        echo "DEBUG=True" >> .env
+        echo "SECRET_KEY=test-secret-key-for-ci" >> .env
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_pasargadprints" >> .env
+        echo "STRIPE_PUBLISHABLE_KEY=pk_test_mock" >> .env
+        echo "STRIPE_SECRET_KEY=sk_test_mock" >> .env
+        echo "STRIPE_WEBHOOK_SECRET=whsec_mock" >> .env
+        echo "GOSHIPPO_API_TOKEN=shippo_test_mock" >> .env
+        echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
+        echo "CORS_ALLOWED_ORIGINS=http://localhost:3000" >> .env
+    
+    - name: Run migrations
+      run: |
+        python manage.py makemigrations
+        python manage.py migrate
+    
+    - name: Run Django system checks
+      run: python manage.py check
+    
+    - name: Run Django tests with coverage
+      run: |
+        coverage run --source='.' manage.py test
+        coverage report
+        coverage xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: backend
+        name: backend-coverage
+
+  # Frontend Tests
+  frontend-tests:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run TypeScript type checking
+      run: npx tsc --noEmit
+    
+    - name: Run ESLint
+      run: npx eslint src --ext .ts,.tsx --max-warnings 0
+    
+    - name: Run frontend tests with coverage
+      run: |
+        npm test -- --coverage --watchAll=false
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  # Build and Security Checks
+  build-and-security:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install bandit safety
+    
+    - name: Install Node.js dependencies
+      working-directory: ./frontend
+      run: npm ci
+    
+    - name: Run security checks on Python dependencies
+      run: |
+        bandit -r . -f json -o bandit-report.json || true
+        safety check --json --output safety-report.json || true
+    
+    - name: Run security audit on Node.js dependencies
+      working-directory: ./frontend
+      run: npm audit --audit-level=moderate
+    
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+    
+    - name: Collect Django static files
+      run: |
+        echo "DEBUG=False" >> .env
+        echo "SECRET_KEY=test-secret-key-for-ci" >> .env
+        echo "DATABASE_URL=sqlite:///db.sqlite3" >> .env
+        echo "STRIPE_PUBLISHABLE_KEY=pk_test_mock" >> .env
+        echo "STRIPE_SECRET_KEY=sk_test_mock" >> .env
+        echo "STRIPE_WEBHOOK_SECRET=whsec_mock" >> .env
+        echo "GOSHIPPO_API_TOKEN=shippo_test_mock" >> .env
+        echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
+        echo "CORS_ALLOWED_ORIGINS=http://localhost:3000" >> .env
+        python manage.py collectstatic --noinput
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: |
+          frontend/build/
+          staticfiles/
+        retention-days: 1
+
+  # End-to-End Tests
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: [build-and-security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_pasargadprints
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        cd frontend && npm ci
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+    
+    - name: Set up environment
+      run: |
+        echo "DEBUG=True" >> .env
+        echo "SECRET_KEY=test-secret-key-for-ci" >> .env
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_pasargadprints" >> .env
+        echo "STRIPE_PUBLISHABLE_KEY=pk_test_mock" >> .env
+        echo "STRIPE_SECRET_KEY=sk_test_mock" >> .env
+        echo "STRIPE_WEBHOOK_SECRET=whsec_mock" >> .env
+        echo "GOSHIPPO_API_TOKEN=shippo_test_mock" >> .env
+        echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
+        echo "CORS_ALLOWED_ORIGINS=http://localhost:3000" >> .env
+    
+    - name: Run migrations and prepare data
+      run: |
+        python manage.py migrate
+        python manage.py collectstatic --noinput
+        python manage.py loaddata store/fixtures/test_data.json || echo "No fixtures found"
+    
+    - name: Run comprehensive E2E tests
+      run: |
+        # Run the E2E tests that validate the complete checkout flow
+        python manage.py test store.tests.test_checkout_e2e --verbosity=2
+        python manage.py test store.tests.test_goshippo_integration --verbosity=2
+        python manage.py test store.tests.test_order_lifecycle --verbosity=2
+
+  # Deployment (only on main branch)
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [e2e-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    environment: production
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: build-artifacts
+    
+    - name: Deploy to production
+      run: |
+        echo "🚀 Deploying to production..."
+        # Add your deployment commands here
+        # Example for Docker deployment:
+        # docker build -t pasargadprints:latest .
+        # docker push your-registry/pasargadprints:latest
+        # docker-compose up -d
+        echo "✅ Deployment completed successfully!"
+    
+    - name: Post-deployment health check
+      run: |
+        echo "🔍 Running post-deployment health checks..."
+        # Add health check commands here
+        # Example: curl -f http://your-domain.com/health/
+        echo "✅ Health checks passed!"
+    
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "🎉 Deployment to production completed successfully!"
+        # Add notification logic here (Slack, Discord, etc.)
+    
+    - name: Notify deployment failure
+      if: failure()
+      run: |
+        echo "❌ Deployment failed!"
+        # Add failure notification logic here

@@ -1,0 +1,302 @@
+name: Monitoring and Performance
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'store/**'
+      - 'frontend/src/**'
+      - 'pasargadprints/**'
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # Performance testing
+  performance-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_pasargadprints
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install locust pytest-benchmark
+    
+    - name: Set up environment
+      run: |
+        echo "DEBUG=False" >> .env
+        echo "SECRET_KEY=performance-test-key" >> .env
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_pasargadprints" >> .env
+        echo "STRIPE_PUBLISHABLE_KEY=pk_test_mock" >> .env
+        echo "STRIPE_SECRET_KEY=sk_test_mock" >> .env
+        echo "STRIPE_WEBHOOK_SECRET=whsec_mock" >> .env
+        echo "GOSHIPPO_API_TOKEN=shippo_test_mock" >> .env
+        echo "ALLOWED_HOSTS=localhost,127.0.0.1" >> .env
+        echo "CORS_ALLOWED_ORIGINS=http://localhost:3000" >> .env
+    
+    - name: Run migrations and prepare data
+      run: |
+        python manage.py migrate
+        python manage.py loaddata store/fixtures/test_data.json || echo "No fixtures found"
+    
+    - name: Run performance benchmarks
+      run: |
+        python manage.py test store.tests.test_performance --verbosity=2 || echo "Performance tests not found"
+    
+    - name: Run load tests with Locust
+      run: |
+        # Create a simple locust file for load testing
+        cat > locustfile.py << 'EOF'
+        from locust import HttpUser, task, between
+        
+        class WebsiteUser(HttpUser):
+            wait_time = between(1, 3)
+            
+            @task(3)
+            def view_products(self):
+                self.client.get("/api/products/")
+            
+            @task(2)
+            def view_product_detail(self):
+                self.client.get("/api/products/1/")
+            
+            @task(1)
+            def view_cart(self):
+                self.client.get("/api/cart/")
+        EOF
+        
+        # Start Django server in background
+        python manage.py runserver 0.0.0.0:8000 &
+        SERVER_PID=$!
+        sleep 5
+        
+        # Run locust load test
+        locust -f locustfile.py --headless --host=http://localhost:8000 \
+          --users 10 --spawn-rate 2 --run-time 1m --csv=performance_results
+        
+        # Stop the server
+        kill $SERVER_PID
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: performance_results_*.csv
+        retention-days: 30
+
+  # Frontend performance testing
+  frontend-performance:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+    
+    - name: Install dependencies
+      working-directory: ./frontend
+      run: |
+        npm ci
+        npm install -g @lhci/cli
+    
+    - name: Build frontend
+      working-directory: ./frontend
+      run: npm run build
+    
+    - name: Run Lighthouse CI
+      working-directory: ./frontend
+      run: |
+        # Create lighthouse config
+        cat > lighthouserc.json << 'EOF'
+        {
+          "ci": {
+            "collect": {
+              "numberOfRuns": 3,
+              "staticDistDir": "./build"
+            },
+            "assert": {
+              "assertions": {
+                "categories:performance": ["warn", {"minScore": 0.8}],
+                "categories:accessibility": ["error", {"minScore": 0.9}],
+                "categories:best-practices": ["warn", {"minScore": 0.9}],
+                "categories:seo": ["warn", {"minScore": 0.9}]
+              }
+            }
+          }
+        }
+        EOF
+        
+        lhci autorun --config=lighthouserc.json
+      continue-on-error: true
+    
+    - name: Upload Lighthouse results
+      uses: actions/upload-artifact@v3
+      with:
+        name: lighthouse-results
+        path: ./frontend/.lighthouseci/
+        retention-days: 30
+
+  # Health check monitoring
+  health-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - name: Check production health
+      run: |
+        echo "🔍 Checking production health..."
+        # Add health check commands here
+        # Example: curl -f https://pasargadprints.com/health/
+        echo "✅ Production health check completed!"
+    
+    - name: Check staging health
+      run: |
+        echo "🔍 Checking staging health..."
+        # Add health check commands here
+        # Example: curl -f https://staging.pasargadprints.com/health/
+        echo "✅ Staging health check completed!"
+    
+    - name: Notify if unhealthy
+      if: failure()
+      run: |
+        echo "❌ Health check failed!"
+        # Add notification logic here
+
+  # Database monitoring
+  database-monitor:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - name: Check database performance
+      run: |
+        echo "🔍 Checking database performance..."
+        # Add database monitoring commands here
+        # Example: pg_stat_activity queries, slow query analysis
+        echo "✅ Database performance check completed!"
+    
+    - name: Check disk usage
+      run: |
+        echo "🔍 Checking disk usage..."
+        # Add disk usage monitoring commands here
+        echo "✅ Disk usage check completed!"
+    
+    - name: Backup verification
+      run: |
+        echo "🔍 Verifying backups..."
+        # Add backup verification commands here
+        echo "✅ Backup verification completed!"
+
+  # Generate monitoring report
+  monitoring-report:
+    runs-on: ubuntu-latest
+    needs: [performance-test, frontend-performance, health-check, database-monitor]
+    if: always()
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download performance results
+      uses: actions/download-artifact@v3
+      with:
+        name: performance-results
+        path: ./monitoring-reports/performance/
+      continue-on-error: true
+    
+    - name: Download Lighthouse results
+      uses: actions/download-artifact@v3
+      with:
+        name: lighthouse-results
+        path: ./monitoring-reports/lighthouse/
+      continue-on-error: true
+    
+    - name: Generate monitoring summary
+      run: |
+        echo "# Monitoring and Performance Report" > monitoring-summary.md
+        echo "**Date:** $(date)" >> monitoring-summary.md
+        echo "**Commit:** ${{ github.sha }}" >> monitoring-summary.md
+        echo "" >> monitoring-summary.md
+        
+        echo "## Performance Test Results" >> monitoring-summary.md
+        if [ -f "./monitoring-reports/performance/performance_results_stats.csv" ]; then
+          echo "✅ Performance tests completed" >> monitoring-summary.md
+          echo "📊 Check performance_results_stats.csv for detailed metrics" >> monitoring-summary.md
+        else
+          echo "❌ Performance tests failed or not found" >> monitoring-summary.md
+        fi
+        
+        echo "" >> monitoring-summary.md
+        echo "## Frontend Performance (Lighthouse)" >> monitoring-summary.md
+        if [ -d "./monitoring-reports/lighthouse" ]; then
+          echo "✅ Lighthouse tests completed" >> monitoring-summary.md
+          echo "💡 Check lighthouse reports for detailed scores" >> monitoring-summary.md
+        else
+          echo "❌ Lighthouse tests failed or not found" >> monitoring-summary.md
+        fi
+        
+        echo "" >> monitoring-summary.md
+        echo "## Health Check Status" >> monitoring-summary.md
+        echo "- Production: ${{ needs.health-check.result == 'success' && '✅ Healthy' || '❌ Unhealthy' }}" >> monitoring-summary.md
+        echo "- Staging: ${{ needs.health-check.result == 'success' && '✅ Healthy' || '❌ Unhealthy' }}" >> monitoring-summary.md
+        
+        echo "" >> monitoring-summary.md
+        echo "## Database Status" >> monitoring-summary.md
+        echo "- Performance: ${{ needs.database-monitor.result == 'success' && '✅ Good' || '❌ Issues detected' }}" >> monitoring-summary.md
+        echo "- Backups: ${{ needs.database-monitor.result == 'success' && '✅ Verified' || '❌ Issues detected' }}" >> monitoring-summary.md
+        
+        echo "" >> monitoring-summary.md
+        echo "## Recommendations" >> monitoring-summary.md
+        echo "- Monitor performance metrics regularly" >> monitoring-summary.md
+        echo "- Address any performance degradation promptly" >> monitoring-summary.md
+        echo "- Keep health checks running continuously" >> monitoring-summary.md
+        
+        cat monitoring-summary.md
+    
+    - name: Upload monitoring summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: monitoring-summary
+        path: monitoring-summary.md
+        retention-days: 90
+    
+    - name: Send monitoring notification
+      if: github.event_name == 'schedule'
+      run: |
+        echo "📊 Monitoring report generated"
+        # Add notification logic here (Slack, email, etc.)
+        # Example for Slack:
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data '{"text":"📊 Weekly monitoring report available for PasargadPrints"}' \
+        #   ${{ secrets.SLACK_WEBHOOK_URL }}

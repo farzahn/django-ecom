@@ -130,7 +130,7 @@ def get_shipping_rates(request):
         
         # Extract rates
         rates = []
-        if hasattr(shipment, 'rates'):
+        if hasattr(shipment, 'rates') and shipment.rates:
             for rate in shipment.rates:
                 rates.append({
                     'id': getattr(rate, 'object_id', rate.get('object_id', 'unknown')),
@@ -142,8 +142,14 @@ def get_shipping_rates(request):
                     'duration_terms': getattr(rate, 'duration_terms', rate.get('duration_terms', ''))
                 })
         
-        # Sort rates by price
-        rates.sort(key=lambda x: float(x['amount']))
+        # Sort rates by price (handle invalid amounts gracefully)
+        def safe_float_sort(rate):
+            try:
+                return float(rate['amount'])
+            except (ValueError, TypeError):
+                return float('inf')  # Put invalid rates at the end
+        
+        rates.sort(key=safe_float_sort)
         
         return Response({
             'rates': rates,

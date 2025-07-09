@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/useStore';
 import DashboardLayout from '../../components/UserDashboard/DashboardLayout';
 import DashboardOverview from '../../components/UserDashboard/sections/DashboardOverview';
 import ProfileManagement from '../../components/UserDashboard/sections/ProfileManagement';
+import OrdersPage from '../OrdersPage';
 
 const DashboardPage: React.FC = () => {
   const { isAuthenticated } = useAuthStore();
@@ -34,26 +35,8 @@ const DashboardPage: React.FC = () => {
       <Route
         path="/orders"
         element={
-          <DashboardLayout title="Order Analytics">
-            <div className="dashboard-card">
-              <div className="dashboard-card-header">
-                <h3 className="dashboard-card-title">Order History & Analytics</h3>
-              </div>
-              <div className="dashboard-card-body">
-                <div className="dashboard-empty">
-                  <div className="dashboard-empty-icon">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                    </svg>
-                  </div>
-                  <h4 className="dashboard-empty-title">Order Analytics Coming Soon</h4>
-                  <p className="dashboard-empty-text">
-                    Advanced order analytics and management features will be available here.
-                  </p>
-                </div>
-              </div>
-            </div>
+          <DashboardLayout title="Order History">
+            <OrdersPage />
           </DashboardLayout>
         }
       />

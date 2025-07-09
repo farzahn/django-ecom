@@ -119,7 +119,7 @@ export const authAPI = {
 // Products API
 export const productsAPI = {
   getProducts: (page = 1, search = '') => 
-    api.get(`/api/products?page=${page}&search=${search}`),
+    api.get(`/api/products/?page=${page}&search=${search}`),
   getProduct: (slug: string) => api.get(`/api/products/${slug}`),
 };
 

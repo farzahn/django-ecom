@@ -349,6 +349,9 @@ class Order(models.Model):
     shipping_service = models.CharField(max_length=100, blank=True, help_text="Shipping service (e.g., Priority Mail)")
     shipping_estimated_days = models.IntegerField(null=True, blank=True, help_text="Estimated delivery days")
     
+    # Stock management
+    stock_deducted = models.BooleanField(default=False, help_text="Indicates if stock has been deducted for this order")
+    
     # Archive functionality
     is_archived = models.BooleanField(default=False)
     archived_at = models.DateTimeField(null=True, blank=True)
