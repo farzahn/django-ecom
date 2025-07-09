@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useStore';
 import UserAvatar from './UserAvatar';
@@ -29,13 +29,20 @@ const UserDropdown: React.FC = () => {
     setIsOpen(!isOpen);
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleToggle();
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/');
     handleClose();
   };
 
-  const menuItems: MenuItem[] = [
+  const menuItems: MenuItem[] = useMemo(() => [
     {
       id: 'dashboard',
       icon: (
@@ -101,7 +108,7 @@ const UserDropdown: React.FC = () => {
       action: handleLogout,
       isDanger: true
     }
-  ];
+  ], [handleLogout]);
 
   const handleMenuItemClick = useCallback((index: number) => {
     const item = menuItems[index];
@@ -113,12 +120,14 @@ const UserDropdown: React.FC = () => {
     }
   }, [menuItems, navigate, handleClose]);
 
-  const { selectedIndex } = useKeyboardNav({
+  const keyboardNavResult = useKeyboardNav({
     isOpen,
     itemCount: menuItems.filter(item => !item.separator).length,
     onClose: handleClose,
     onSelect: handleMenuItemClick
   });
+  
+  const { selectedIndex } = keyboardNavResult || { selectedIndex: -1 };
 
   const dropdownRef = useClickOutside<HTMLDivElement>(handleClose, isOpen);
 
@@ -139,6 +148,7 @@ const UserDropdown: React.FC = () => {
         type="button"
         className={`flex items-center gap-2 py-2 px-3 bg-transparent border border-transparent rounded-lg cursor-pointer transition-all duration-200 text-gray-800 font-medium text-sm hover:bg-gray-100 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isOpen ? 'bg-gray-100 border-gray-300' : ''}`}
         onClick={handleToggle}
+        onKeyDown={handleKeyDown}
         aria-expanded={isOpen}
         aria-haspopup="menu"
         aria-label="User menu"

@@ -1,9 +1,29 @@
 import { renderHook, act } from '@testing-library/react';
 import { useAuthStore, useCartStore } from '../useStore';
-import { authAPI, cartAPI } from '../../services/api';
 
 // Mock the APIs
-jest.mock('../../services/api');
+jest.mock('../../services/api', () => ({
+  ...jest.requireActual('../../services/api'),
+  authAPI: {
+    login: jest.fn(),
+    logout: jest.fn(),
+    register: jest.fn(),
+  },
+  cartAPI: {
+    getCart: jest.fn(),
+    addToCart: jest.fn(),
+    removeFromCart: jest.fn(),
+    updateCartItem: jest.fn(),
+    clearCart: jest.fn(),
+  },
+  handleApiError: jest.fn().mockImplementation(() => ({
+    type: 'test',
+    message: 'Test error message',
+    retryable: false
+  }))
+}));
+
+import { authAPI, cartAPI } from '../../services/api';
 const mockAuthAPI = authAPI as jest.Mocked<typeof authAPI>;
 const mockCartAPI = cartAPI as jest.Mocked<typeof cartAPI>;
 

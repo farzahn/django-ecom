@@ -4,7 +4,7 @@ interface UseKeyboardNavProps {
   isOpen: boolean;
   itemCount: number;
   onClose: () => void;
-  onSelect: (index: number) => void;
+  onSelect?: (index: number) => void;
 }
 
 function useKeyboardNav({
@@ -48,7 +48,7 @@ function useKeyboardNav({
       case 'Enter':
       case ' ':
         event.preventDefault();
-        if (selectedIndex >= 0) {
+        if (selectedIndex >= 0 && onSelect) {
           onSelect(selectedIndex);
         }
         break;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { US_STATES, USState } from '../../data/usStates';
+import { US_STATES } from '../../data/usStates';
 
 export interface AddressData {
   full_name: string;
@@ -10,13 +10,6 @@ export interface AddressData {
   postal_code: string;
   country: string;
   is_default: boolean;
-}
-
-interface AddressAutocompletePlaceholder {
-  address_line_1?: string;
-  city?: string;
-  state?: string;
-  postal_code?: string;
 }
 
 interface AddressAutocompleteProps {

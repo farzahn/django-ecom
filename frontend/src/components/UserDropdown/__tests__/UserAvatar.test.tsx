@@ -32,20 +32,23 @@ describe('UserAvatar', () => {
 
   it('applies correct size classes', () => {
     const { rerender } = render(<UserAvatar user={mockUser} size="sm" />);
-    expect(document.querySelector('.user-avatar-sm')).toBeInTheDocument();
+    expect(document.querySelector('.w-8')).toBeInTheDocument();
+    expect(document.querySelector('.h-8')).toBeInTheDocument();
 
     rerender(<UserAvatar user={mockUser} size="md" />);
-    expect(document.querySelector('.user-avatar-md')).toBeInTheDocument();
+    expect(document.querySelector('.w-10')).toBeInTheDocument();
+    expect(document.querySelector('.h-10')).toBeInTheDocument();
 
     rerender(<UserAvatar user={mockUser} size="lg" />);
-    expect(document.querySelector('.user-avatar-lg')).toBeInTheDocument();
+    expect(document.querySelector('.w-12')).toBeInTheDocument();
+    expect(document.querySelector('.h-12')).toBeInTheDocument();
   });
 
   it('shows online status when enabled', () => {
     render(<UserAvatar user={mockUser} showOnlineStatus={true} />);
     
-    expect(document.querySelector('.user-avatar-status.online')).toBeInTheDocument();
-    expect(document.querySelector('.status-dot')).toBeInTheDocument();
+    expect(document.querySelector('.bg-green-500')).toBeInTheDocument();
+    expect(document.querySelector('.rounded-full.w-2.h-2')).toBeInTheDocument();
   });
 
   it('does not show online status by default', () => {
@@ -83,7 +86,7 @@ describe('UserAvatar', () => {
     render(<UserAvatar user={emptyUser} />);
     
     // Should not crash and show empty string
-    const avatar = document.querySelector('.user-avatar-circle');
+    const avatar = document.querySelector('.rounded-full');
     expect(avatar).toBeInTheDocument();
   });
 });

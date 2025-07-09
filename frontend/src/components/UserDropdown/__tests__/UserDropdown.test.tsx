@@ -1,21 +1,15 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import UserDropdown from '../UserDropdown';
-import { useAuthStore } from '../../../store/useStore';
 
-// Mock the store
-jest.mock('../../../store/useStore');
-const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
-
-// Mock the hooks
+// Mock the hooks first
 jest.mock('../hooks/useClickOutside', () => {
   return jest.fn(() => ({ current: null }));
 });
 
 jest.mock('../hooks/useKeyboardNav', () => ({
   __esModule: true,
-  default: jest.fn(() => ({ selectedIndex: -1 }))
+  default: jest.fn(() => ({ selectedIndex: -1, setSelectedIndex: jest.fn() }))
 }));
 
 // Mock react-router-dom navigate
@@ -23,6 +17,14 @@ const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate
 }), { virtual: true });
+
+// Mock the store
+jest.mock('../../../store/useStore');
+
+import UserDropdown from '../UserDropdown';
+import { useAuthStore } from '../../../store/useStore';
+
+const mockUseAuthStore = useAuthStore as jest.MockedFunction<typeof useAuthStore>;
 
 describe('UserDropdown', () => {
   const mockUser = {
@@ -172,13 +174,13 @@ describe('UserDropdown', () => {
     render(<UserDropdown />);
 
     const trigger = screen.getByRole('button', { name: /user menu/i });
-    const arrow = trigger.querySelector('.user-dropdown-arrow');
+    const arrow = trigger.querySelector('svg');
     
-    expect(arrow).not.toHaveClass('open');
+    expect(arrow).not.toHaveClass('rotate-180');
 
     fireEvent.click(trigger);
     
-    expect(arrow).toHaveClass('open');
+    expect(arrow).toHaveClass('rotate-180');
   });
 
   it('displays user initials in avatar', () => {

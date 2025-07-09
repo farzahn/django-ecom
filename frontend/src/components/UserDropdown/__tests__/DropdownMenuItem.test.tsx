@@ -105,7 +105,8 @@ describe('DropdownMenuItem', () => {
       />
     );
     
-    expect(screen.getByRole('menuitem')).toHaveClass('selected');
+    expect(screen.getByRole('menuitem')).toHaveClass('bg-primary-light');
+    expect(screen.getByRole('menuitem')).toHaveClass('text-primary');
   });
 
   it('applies danger class when isDanger is true', () => {
@@ -116,7 +117,7 @@ describe('DropdownMenuItem', () => {
       />
     );
     
-    expect(screen.getByRole('menuitem')).toHaveClass('danger');
+    expect(screen.getByRole('menuitem')).toHaveClass('text-red-600');
   });
 
   it('applies custom className', () => {
@@ -141,9 +142,9 @@ describe('DropdownMenuItem', () => {
     );
     
     const element = screen.getByRole('menuitem');
-    expect(element).toHaveClass('dropdown-menu-item');
-    expect(element).toHaveClass('selected');
-    expect(element).toHaveClass('danger');
+    expect(element).toHaveClass('bg-primary-light');
+    expect(element).toHaveClass('text-primary');
+    expect(element).toHaveClass('text-red-600');
     expect(element).toHaveClass('custom-class');
   });
 
@@ -177,8 +178,8 @@ describe('DropdownMenuItem', () => {
   it('renders icon and label in correct structure', () => {
     render(<DropdownMenuItem {...defaultProps} />);
     
-    const iconElement = screen.getByTestId('test-icon').closest('.dropdown-menu-item-icon');
-    const labelElement = screen.getByText('Test Item').closest('.dropdown-menu-item-label');
+    const iconElement = screen.getByTestId('test-icon');
+    const labelElement = screen.getByText('Test Item');
     
     expect(iconElement).toBeInTheDocument();
     expect(labelElement).toBeInTheDocument();

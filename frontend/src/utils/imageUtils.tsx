@@ -90,8 +90,5 @@ export const ProductImage: React.FC<ProductImageProps> = ({
   );
 };
 
-export default {
-  getImageUrl,
-  getProductImageUrl,
-  ProductImage
-};
+// Named exports are already available above
+// If you need a combined export, you can import the individual named exports

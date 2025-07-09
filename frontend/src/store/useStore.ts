@@ -131,7 +131,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       const errorInfo = handleApiError(error);
       set({ 
         isLoading: false, 
-        error: errorInfo.message 
+        error: errorInfo?.message || 'An unexpected error occurred' 
       });
       throw error;
     }
@@ -144,7 +144,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       await get().fetchCart();
     } catch (error) {
       const errorInfo = handleApiError(error);
-      set({ error: errorInfo.message });
+      set({ error: errorInfo?.message || 'An unexpected error occurred' });
       throw error;
     }
   },
@@ -156,7 +156,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       await get().fetchCart();
     } catch (error) {
       const errorInfo = handleApiError(error);
-      set({ error: errorInfo.message });
+      set({ error: errorInfo?.message || 'An unexpected error occurred' });
       throw error;
     }
   },
@@ -168,7 +168,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       await get().fetchCart();
     } catch (error) {
       const errorInfo = handleApiError(error);
-      set({ error: errorInfo.message });
+      set({ error: errorInfo?.message || 'An unexpected error occurred' });
       throw error;
     }
   },
@@ -180,7 +180,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       set({ cart: null, lastUpdated: Date.now() });
     } catch (error) {
       const errorInfo = handleApiError(error);
-      set({ error: errorInfo.message });
+      set({ error: errorInfo?.message || 'An unexpected error occurred' });
       throw error;
     }
   },
