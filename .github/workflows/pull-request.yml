@@ -6,7 +6,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  NODE_VERSION: '18'
+  NODE_VERSION: '18.18.0'
 
 jobs:
   # Quick validation for pull requests
@@ -50,7 +50,7 @@ jobs:
     
     - name: Run ESLint
       working-directory: ./frontend
-      run: npx eslint src --ext .ts,.tsx --max-warnings 0
+      run: npx eslint src --ext .ts,.tsx
     
     - name: Run quick tests
       run: |

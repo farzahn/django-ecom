@@ -17,7 +17,7 @@ on:
 
 env:
   PYTHON_VERSION: '3.11'
-  NODE_VERSION: '18'
+  NODE_VERSION: '18.18.0'
 
 jobs:
   # Build and prepare deployment artifacts

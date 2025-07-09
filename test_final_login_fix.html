@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Final Login Fix Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        .test-result { margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Final Login Fix Verification Test</h1>
+    <p>This test simulates the exact browser scenario that was failing with 403 Forbidden errors.</p>
+    
+    <button onclick="runAllTests()">Run All Tests</button>
+    <div id="results"></div>
+    
+    <script>
+        // Configure axios exactly like the frontend
+        const api = axios.create({
+            baseURL: 'http://localhost:8000',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            withCredentials: true,  // This was causing the 403 error
+            timeout: 10000,
+        });
+
+        // Add request interceptor like the real frontend
+        api.interceptors.request.use((config) => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                config.headers.Authorization = `Token ${token}`;
+            }
+            return config;
+        });
+
+        async function testLogin() {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result';
+            
+            try {
+                console.log('🧪 Testing login with withCredentials: true...');
+                
+                const response = await api.post('/api/login/', {
+                    username: 'testuser',
+                    password: 'testpass123'
+                });
+                
+                resultDiv.innerHTML = `
+                    <h3 class="success">✅ LOGIN TEST PASSED!</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>User:</strong> ${response.data.user.username}</p>
+                    <p><strong>Token:</strong> ${response.data.token.substring(0, 20)}...</p>
+                    <p>🎉 The 403 Forbidden error is fixed!</p>
+                `;
+                
+                // Store token for subsequent tests
+                localStorage.setItem('token', response.data.token);
+                return true;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3 class="error">❌ LOGIN TEST FAILED</h3>
+                    <p><strong>Status:</strong> ${error.response?.status || 'Network Error'}</p>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>🚨 The 403 Forbidden error still exists!</p>
+                    <pre>${JSON.stringify(error.response?.data || error.message, null, 2)}</pre>
+                `;
+                return false;
+            } finally {
+                document.getElementById('results').appendChild(resultDiv);
+            }
+        }
+
+        async function testAuthenticatedRequest() {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result';
+            
+            try {
+                console.log('🧪 Testing authenticated request...');
+                
+                const response = await api.get('/api/profile/');
+                
+                resultDiv.innerHTML = `
+                    <h3 class="success">✅ AUTHENTICATED REQUEST PASSED!</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Profile:</strong> ${response.data.username}</p>
+                    <p>✅ Token authentication working correctly</p>
+                `;
+                return true;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3 class="error">❌ AUTHENTICATED REQUEST FAILED</h3>
+                    <p><strong>Status:</strong> ${error.response?.status || 'Network Error'}</p>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                `;
+                return false;
+            } finally {
+                document.getElementById('results').appendChild(resultDiv);
+            }
+        }
+
+        async function testRegister() {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result';
+            
+            try {
+                console.log('🧪 Testing register with withCredentials: true...');
+                
+                const randomNum = Math.floor(Math.random() * 10000);
+                const response = await api.post('/api/register/', {
+                    username: `testuser${randomNum}`,
+                    email: `test${randomNum}@example.com`,
+                    password: 'testpass123',
+                    first_name: 'Test',
+                    last_name: 'User'
+                });
+                
+                resultDiv.innerHTML = `
+                    <h3 class="success">✅ REGISTER TEST PASSED!</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>User:</strong> ${response.data.user.username}</p>
+                    <p>✅ Register endpoint also working</p>
+                `;
+                return true;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <h3 class="error">❌ REGISTER TEST FAILED</h3>
+                    <p><strong>Status:</strong> ${error.response?.status || 'Network Error'}</p>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                `;
+                return false;
+            } finally {
+                document.getElementById('results').appendChild(resultDiv);
+            }
+        }
+
+        async function runAllTests() {
+            document.getElementById('results').innerHTML = '<h2>Running Tests...</h2>';
+            
+            const loginSuccess = await testLogin();
+            if (loginSuccess) {
+                await testAuthenticatedRequest();
+            }
+            await testRegister();
+            
+            // Summary
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'test-result';
+            summaryDiv.style.background = loginSuccess ? '#d4edda' : '#f8d7da';
+            summaryDiv.innerHTML = `
+                <h2>${loginSuccess ? '🎉 ALL TESTS COMPLETED!' : '⚠️ TESTS COMPLETED WITH ISSUES'}</h2>
+                <p>${loginSuccess ? 
+                    'The 403 Forbidden login error has been successfully resolved! Users can now sign in through the frontend.' : 
+                    'Login is still failing. The fix may need additional work.'
+                }</p>
+            `;
+            document.getElementById('results').appendChild(summaryDiv);
+        }
+        
+        // Auto-run test when page loads
+        window.onload = () => {
+            setTimeout(runAllTests, 1000);
+        };
+    </script>
+</body>
+</html>
