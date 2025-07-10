@@ -105,7 +105,7 @@ jobs:
         kill $SERVER_PID
     
     - name: Upload performance results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: performance-results
         path: performance_results_*.csv
@@ -162,7 +162,7 @@ jobs:
       continue-on-error: true
     
     - name: Upload Lighthouse results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: lighthouse-results
         path: ./frontend/.lighthouseci/
@@ -229,14 +229,14 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Download performance results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: performance-results
         path: ./monitoring-reports/performance/
       continue-on-error: true
     
     - name: Download Lighthouse results
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: lighthouse-results
         path: ./monitoring-reports/lighthouse/
@@ -285,7 +285,7 @@ jobs:
         cat monitoring-summary.md
     
     - name: Upload monitoring summary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: monitoring-summary
         path: monitoring-summary.md

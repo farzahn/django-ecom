@@ -89,7 +89,7 @@ jobs:
           .
     
     - name: Upload deployment package
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: deployment-package
         path: deployment.tar.gz
@@ -107,7 +107,7 @@ jobs:
     
     steps:
     - name: Download deployment package
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: deployment-package
     
@@ -147,7 +147,7 @@ jobs:
     
     steps:
     - name: Download deployment package
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         name: deployment-package
     
