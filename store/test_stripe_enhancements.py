@@ -118,37 +118,18 @@ class StripeEnhancedIntegrationTest(APITestCase):
         self.assertEqual(metadata['order_type'], '3d_print_products')
         self.assertEqual(metadata['source'], 'web_checkout')
         
-        # Check enhanced features
+        # Check that Stripe shipping is explicitly disabled (we use GoShippo)
         self.assertIn('shipping_address_collection', session_call_args)
+        self.assertIsNone(session_call_args['shipping_address_collection'])
         self.assertIn('shipping_options', session_call_args)
-        self.assertIn('phone_number_collection', session_call_args)
-        self.assertIn('custom_text', session_call_args)
-        self.assertIn('invoice_creation', session_call_args)
-        self.assertIn('consent_collection', session_call_args)
+        self.assertEqual(session_call_args['shipping_options'], [])
         
-        # Verify shipping options
-        shipping_options = session_call_args['shipping_options']
-        self.assertEqual(len(shipping_options), 2)  # Standard and Express
+        # Verify automatic tax is disabled
+        self.assertIn('automatic_tax', session_call_args)
+        self.assertFalse(session_call_args['automatic_tax']['enabled'])
         
-        # Check standard shipping
-        standard_shipping = shipping_options[0]
-        self.assertEqual(standard_shipping['shipping_rate_data']['display_name'], 'Standard Shipping')
-        self.assertEqual(standard_shipping['shipping_rate_data']['fixed_amount']['amount'], 999)
-        
-        # Check express shipping
-        express_shipping = shipping_options[1]
-        self.assertEqual(express_shipping['shipping_rate_data']['display_name'], 'Express Shipping')
-        self.assertEqual(express_shipping['shipping_rate_data']['fixed_amount']['amount'], 1999)
-        
-        # Check custom text
-        custom_text = session_call_args['custom_text']
-        self.assertIn('shipping_address', custom_text)
-        self.assertIn('submit', custom_text)
-        
-        # Check invoice creation
-        invoice_creation = session_call_args['invoice_creation']
-        self.assertTrue(invoice_creation['enabled'])
-        self.assertIn('PasargadPrints Order', invoice_creation['invoice_data']['description'])
+        # Check GoShippo integration metadata
+        self.assertEqual(metadata['shipping_integration'], 'goshippo')
         
         # Verify customer was updated with Stripe ID
         self.customer.refresh_from_db()
